@@ -56,16 +56,6 @@ canvas {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.hud {
-  position: fixed;
-  left: 1rem;
-  bottom: 1rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  color: var(--fg-dim);
-  pointer-events: none;
-}
-
 .star-tag {
   display: flex;
   flex-direction: column;

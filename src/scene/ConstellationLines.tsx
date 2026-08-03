@@ -90,7 +90,9 @@ export function ConstellationLines() {
     return buildSegments([constellation], catalog.t0)
   }, [catalog, active])
 
-  const baseMaterial = useMemo(() => createLineMaterial('#4d7fb8', 0.32), [])
+  // All 88 figures at once is a lot of line; they read as texture rather than
+  // clutter only when kept well under the stars in brightness.
+  const baseMaterial = useMemo(() => createLineMaterial('#4d7fb8', 0.18), [])
   const activeMaterial = useMemo(() => createLineMaterial('#8fd0ff', 0.95), [])
 
   useEffect(() => () => baseMaterial.dispose(), [baseMaterial])
@@ -105,7 +107,7 @@ export function ConstellationLines() {
     }
     // Selecting one figure pushes the rest back rather than hiding them, so the
     // chosen constellation reads against its context.
-    baseMaterial.uniforms.uOpacity.value = active ? 0.1 : 0.32
+    baseMaterial.uniforms.uOpacity.value = active ? 0.07 : 0.18
   }, [baseMaterial, activeMaterial, dissolve, active, sphereRadiusPc])
 
   if (!show || !all) return null

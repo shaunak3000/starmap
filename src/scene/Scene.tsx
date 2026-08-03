@@ -5,6 +5,8 @@ import { CameraRig } from './CameraRig.tsx'
 import { ConstellationLines } from './ConstellationLines.tsx'
 import { ConstellationMembers } from './ConstellationMembers.tsx'
 import { DistanceGrid } from './DistanceGrid.tsx'
+import { Picking } from './Picking.tsx'
+import { SelectionMarker } from './SelectionMarker.tsx'
 import { StarField } from './StarField.tsx'
 import { Sun } from './Sun.tsx'
 import { frameMatrix } from './frame.ts'
@@ -22,6 +24,7 @@ export function Scene() {
   return (
     <>
       <CameraRig />
+      <Picking />
 
       <group matrixAutoUpdate={false} matrix={matrix}>
         {catalog && <StarField tier={catalog.t0} />}
@@ -29,6 +32,7 @@ export function Scene() {
         {fieldTier && <StarField tier={fieldTier} sizeScale={0.7} visible={showFaintField} />}
         <ConstellationLines />
         <ConstellationMembers />
+        <SelectionMarker />
         <DistanceGrid />
       </group>
 

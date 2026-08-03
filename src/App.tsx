@@ -3,11 +3,14 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene.tsx'
 import { useStarmap } from './state/store.ts'
+import { Hud } from './ui/Hud.tsx'
+import { SearchBox } from './ui/SearchBox.tsx'
+import { Sidebar } from './ui/Sidebar.tsx'
+import { StarCard } from './ui/StarCard.tsx'
 
-function Overlay() {
+function LoadState() {
   const loading = useStarmap((state) => state.loading)
   const error = useStarmap((state) => state.error)
-  const catalog = useStarmap((state) => state.catalog)
 
   if (error) {
     return (
@@ -27,18 +30,12 @@ function Overlay() {
     )
   }
 
-  if (!catalog) return null
-
-  const total = catalog.t0.count + catalog.t1.count
-  return (
-    <div className="hud">
-      {total.toLocaleString()} stars · {catalog.constellations.length} constellations
-    </div>
-  )
+  return null
 }
 
 export default function App() {
   const init = useStarmap((state) => state.init)
+  const ready = useStarmap((state) => state.catalog !== null)
 
   useEffect(() => {
     void init()
@@ -62,7 +59,17 @@ export default function App() {
         <color attach="background" args={['#05060a']} />
         <Scene />
       </Canvas>
-      <Overlay />
+
+      <LoadState />
+
+      {ready && (
+        <>
+          <Sidebar />
+          <SearchBox />
+          <StarCard />
+          <Hud />
+        </>
+      )}
     </>
   )
 }

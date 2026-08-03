@@ -51,7 +51,15 @@ async function main() {
   await page.waitForSelector('canvas', { timeout: 30000 })
 
   if (script) {
-    await page.evaluate(script)
+    // Wrap in an IIFE so multi-statement scripts are a valid expression, and
+    // surface throws instead of quietly producing a screenshot of nothing.
+    const outcome = (await page.evaluate(
+      `(() => { try { ${script}\n; return { ok: true } } catch (e) { return { ok: false, error: String(e) } } })()`,
+    )) as { ok: boolean; error?: string }
+
+    if (!outcome?.ok) {
+      throw new Error(`--eval failed: ${outcome?.error ?? 'unknown error'}`)
+    }
   }
 
   await page.waitForTimeout(waitMs)
