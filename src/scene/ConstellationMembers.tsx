@@ -1,0 +1,180 @@
+import { useEffect, useMemo } from 'react'
+import { Html } from '@react-three/drei'
+import * as THREE from 'three'
+import { LY_PER_PC } from '../lib/astro.ts'
+import { FIELDS_PER_STAR } from '../lib/catalog-format.ts'
+import { starLabel } from '../lib/catalog-loader.ts'
+import { useStarmap } from '../state/store.ts'
+import { CELESTIAL_SPHERE_RADIUS_PC } from './StarField.tsx'
+
+/** Ring markers so a figure's vertices stay findable at any range. */
+const VERTEX_SHADER = /* glsl */ `
+  uniform float uDissolve;
+  uniform float uSphereRadius;
+  uniform float uSize;
+  uniform float uPixelRatio;
+
+  void main() {
+    vec3 renderPosition = mix(
+      normalize(position) * uSphereRadius,
+      position,
+      uDissolve
+    );
+    vec4 viewPosition = modelViewMatrix * vec4(renderPosition, 1.0);
+    gl_Position = projectionMatrix * viewPosition;
+    gl_PointSize = uSize * uPixelRatio;
+  }
+`
+
+const FRAGMENT_SHADER = /* glsl */ `
+  precision highp float;
+  uniform vec3 uColor;
+
+  void main() {
+    vec2 uv = gl_PointCoord * 2.0 - 1.0;
+    float r = length(uv);
+    if (r > 1.0) discard;
+    // Hollow ring: a filled dot would just be mistaken for the star itself.
+    float ring = smoothstep(0.55, 0.72, r) * (1.0 - smoothstep(0.88, 1.0, r));
+    if (ring < 0.01) discard;
+    gl_FragColor = vec4(uColor, ring * 0.9);
+  }
+`
+
+export function ConstellationMembers() {
+  const catalog = useStarmap((state) => state.catalog)
+  const active = useStarmap((state) => state.activeConstellation)
+  const dissolve = useStarmap((state) => state.dissolve)
+  const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
+  const showLabels = useStarmap((state) => state.showLabels)
+  const unit = useStarmap((state) => state.unit)
+  const show = useStarmap((state) => state.showConstellations)
+
+  const constellation = useMemo(() => {
+    if (!catalog || !active) return null
+    return catalog.constellations.find((c) => c.id === active) ?? null
+  }, [catalog, active])
+
+  /** True positions and distances, in catalogue space. */
+  const members = useMemo(() => {
+    if (!catalog || !constellation) return []
+    return constellation.members.map((index) => {
+      const base = index * FIELDS_PER_STAR
+      const position = new THREE.Vector3(
+        catalog.t0.attributes[base],
+        catalog.t0.attributes[base + 1],
+        catalog.t0.attributes[base + 2],
+      )
+      return {
+        index,
+        position,
+        distancePc: position.length(),
+        meta: catalog.metaByIndex.get(index),
+      }
+    })
+  }, [catalog, constellation])
+
+  const geometry = useMemo(() => {
+    if (members.length === 0) return null
+    const positions = new Float32Array(members.length * 3)
+    members.forEach((member, i) => {
+      positions[i * 3] = member.position.x
+      positions[i * 3 + 1] = member.position.y
+      positions[i * 3 + 2] = member.position.z
+    })
+    const buffer = new THREE.BufferGeometry()
+    buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    return buffer
+  }, [members])
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: VERTEX_SHADER,
+        fragmentShader: FRAGMENT_SHADER,
+        uniforms: {
+          uDissolve: { value: 1 },
+          uSphereRadius: { value: CELESTIAL_SPHERE_RADIUS_PC },
+          uColor: { value: new THREE.Color('#8fd0ff') },
+          uSize: { value: 16 },
+          uPixelRatio: { value: window.devicePixelRatio },
+        },
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+      }),
+    [],
+  )
+
+  useEffect(() => {
+    material.uniforms.uDissolve.value = dissolve
+    material.uniforms.uSphereRadius.value = sphereRadiusPc
+  }, [material, dissolve, sphereRadiusPc])
+
+  useEffect(() => () => material.dispose(), [material])
+  useEffect(() => () => geometry?.dispose(), [geometry])
+
+  /**
+   * Labelling every member turns the near end of a figure into a pile of
+   * overlapping text. Named stars are the ones people recognise, and the
+   * nearest and farthest members are the ones carrying the argument.
+   */
+  const labelled = useMemo(() => {
+    if (members.length === 0) return []
+
+    const byDistance = [...members].sort((a, b) => a.distancePc - b.distancePc)
+    const keep = new Set<number>([
+      byDistance[0].index,
+      byDistance[byDistance.length - 1].index,
+    ])
+    for (const member of members) {
+      if (member.meta?.proper) keep.add(member.index)
+    }
+
+    return members.filter((member) => keep.has(member.index))
+  }, [members])
+
+  /** Where each label sits once the collapse is applied. */
+  const labelPositions = useMemo(
+    () =>
+      labelled.map((member) =>
+        member.position
+          .clone()
+          .normalize()
+          .multiplyScalar(sphereRadiusPc)
+          .lerp(member.position, dissolve),
+      ),
+    [labelled, dissolve, sphereRadiusPc],
+  )
+
+  if (!show || !constellation || !geometry) return null
+
+  return (
+    <>
+      <points geometry={geometry} material={material} frustumCulled={false} />
+
+      {/* Labels quote true distances, so they would be lying about a star drawn
+          on the shell. They fade out with the collapse. */}
+      {showLabels &&
+        dissolve > 0.6 &&
+        labelled.map((member, i) => (
+          <Html
+            key={member.index}
+            position={labelPositions[i]}
+            center
+            zIndexRange={[20, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div className="star-tag">
+              <span className="star-tag-name">{starLabel(member.meta)}</span>
+              <span className="star-tag-distance">
+                {unit === 'pc'
+                  ? `${member.distancePc.toFixed(0)} pc`
+                  : `${(member.distancePc * LY_PER_PC).toFixed(0)} ly`}
+              </span>
+            </div>
+          </Html>
+        ))}
+    </>
+  )
+}

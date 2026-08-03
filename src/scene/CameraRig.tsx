@@ -222,12 +222,33 @@ export function CameraRig() {
     state.distance = Math.max(focusRequest.distance, MIN_DISTANCE_PC)
     lastOrbitDistance.current = state.distance
 
+    if (focusRequest.lookFrom) {
+      // The request names where the camera should stand relative to the target;
+      // the rig stores the direction it looks, which is the opposite.
+      scratch.dir
+        .set(...focusRequest.lookFrom)
+        .applyMatrix4(dataToWorld)
+        .normalize()
+        .negate()
+
+      state.yaw = Math.atan2(scratch.dir.x, scratch.dir.z)
+      state.pitch = Math.max(
+        -PITCH_LIMIT,
+        Math.min(PITCH_LIMIT, Math.asin(THREE.MathUtils.clamp(scratch.dir.y, -1, 1))),
+      )
+
+      // Yaw is unbounded, so approach the requested heading the short way round
+      // rather than unwinding several turns.
+      const turns = Math.round((actual.current.yaw - state.yaw) / (Math.PI * 2))
+      state.yaw += turns * Math.PI * 2
+    }
+
     // Travelling somewhere implies wanting to look at it, so leave the
     // origin-locked planetarium view rather than silently ignoring the request.
     if (useStarmap.getState().cameraMode === 'earth') {
       useStarmap.setState({ cameraMode: 'orbit' })
     }
-  }, [focusRequest])
+  }, [focusRequest, dataToWorld, scratch])
 
   useFrame((_, rawDelta) => {
     // Clamp so a stalled tab does not teleport the camera on the next frame.

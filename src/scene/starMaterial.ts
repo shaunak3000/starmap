@@ -56,6 +56,8 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float uMapRefAbsMag;
   uniform float uMaxDistancePc;
   uniform float uSaturation;
+  uniform float uDissolve;      // 0 = celestial sphere, 1 = true distances
+  uniform float uSphereRadius;
 
   attribute float aAbsMag;
   attribute float aColorIndex;
@@ -66,13 +68,25 @@ const VERTEX_SHADER = /* glsl */ `
   ${COLOUR_GLSL}
 
   void main() {
-    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_Position = projectionMatrix * viewPosition;
-
     // Distance from the Sun is rotation-invariant, so this stays valid in any
     // reference frame the scene graph happens to be using.
     float distanceFromSun = length(position);
-    float distanceFromCamera = max(length(viewPosition.xyz), 1e-4);
+
+    // Photometry always uses the true geometry, even while the rendered
+    // positions are collapsed onto the sphere. Otherwise flattening the field
+    // would relight the sky and the Earth view would stop matching reality.
+    vec4 truePosition = modelViewMatrix * vec4(position, 1.0);
+    float distanceFromCamera = max(length(truePosition.xyz), 1e-4);
+
+    // Collapsing every star onto a shell is the pre-Copernican sky: from the
+    // Sun it is indistinguishable from the real thing, and from anywhere else
+    // it falls apart. That contrast is the whole point of the app.
+    vec3 renderPosition = mix(
+      normalize(position) * uSphereRadius,
+      position,
+      uDissolve
+    );
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(renderPosition, 1.0);
 
     vColor = saturateColour(temperatureToRgb(bvToTemperature(aColorIndex)), uSaturation);
 
@@ -164,6 +178,8 @@ export function createStarMaterial(options: StarMaterialOptions = {}): THREE.Sha
       uMapRefAbsMag: { value: 5.0 },
       uMaxDistancePc: { value: 1000 },
       uSaturation: { value: 1.55 },
+      uDissolve: { value: 1 },
+      uSphereRadius: { value: 120 },
       uFalloff: { value: 4.5 },
     },
     transparent: true,

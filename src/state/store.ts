@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CatalogTier } from '../lib/catalog-format.ts'
 import { type LoadedCatalog, loadCatalog, loadTier } from '../lib/catalog-loader.ts'
+import { constellationVantage } from '../lib/constellation-view.ts'
 
 /**
  * How star size is derived.
@@ -29,6 +30,8 @@ export interface Selection {
 export interface FocusRequest {
   position: [number, number, number]
   distance: number
+  /** Unit direction from the target toward the camera, in data space. */
+  lookFrom?: [number, number, number]
   token: number
 }
 
@@ -64,6 +67,12 @@ interface StarmapState {
   activeConstellation: string | null
   /** 0 = figure projected on the celestial sphere, 1 = true 3D positions. */
   dissolve: number
+  /**
+   * Radius of the shell stars collapse onto at dissolve 0. Tracks the figure
+   * being revealed, so collapsing rescales the sky instead of shrinking it into
+   * a distant marble.
+   */
+  sphereRadiusPc: number
 
   focusRequest: FocusRequest | null
   /** Metres-per-second equivalent for fly mode, in parsecs per second. */
@@ -76,7 +85,13 @@ interface StarmapState {
   set: <K extends keyof StarmapState>(key: K, value: StarmapState[K]) => void
   select: (index: number | null) => void
   setActiveConstellation: (id: string | null) => void
-  focusOn: (position: [number, number, number], distance?: number) => void
+  focusOn: (
+    position: [number, number, number],
+    distance?: number,
+    lookFrom?: [number, number, number],
+  ) => void
+  /** Flies side-on to a figure and expands it to true distances. */
+  revealConstellation: (id: string) => void
 }
 
 export const useStarmap = create<StarmapState>((set, get) => ({
@@ -104,7 +119,10 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   selection: null,
   hovered: null,
   activeConstellation: null,
-  dissolve: 0,
+  // Truth is the default; collapsing to the celestial sphere is the deliberate
+  // act that shows what the constellations assume.
+  dissolve: 1,
+  sphereRadiusPc: 120,
 
   focusRequest: null,
   flySpeed: 5,
@@ -153,14 +171,41 @@ export const useStarmap = create<StarmapState>((set, get) => ({
       dissolve: id === null ? 0 : state.dissolve,
     })),
 
-  focusOn: (position, distance = 4) =>
+  focusOn: (position, distance = 4, lookFrom) =>
     set((state) => ({
       focusRequest: {
         position,
         distance,
+        lookFrom,
         token: (state.focusRequest?.token ?? 0) + 1,
       },
     })),
+
+  revealConstellation: (id) => {
+    const { catalog } = get()
+    if (!catalog) return
+
+    const constellation = catalog.constellations.find((c) => c.id === id)
+    if (!constellation) return
+
+    const vantage = constellationVantage(constellation, catalog.t0)
+    set((state) => ({
+      activeConstellation: id,
+      showConstellations: true,
+      // Expanding to true distances is the reveal itself; the camera move only
+      // provides an angle from which it is visible.
+      dissolve: 1,
+      // Match the shell to the figure so the collapse reads as stars sliding
+      // along their sight lines, not as the sky shrinking away.
+      sphereRadiusPc: vantage.spanPc * 0.5,
+      focusRequest: {
+        position: vantage.target,
+        distance: vantage.distance,
+        lookFrom: vantage.lookFrom,
+        token: (state.focusRequest?.token ?? 0) + 1,
+      },
+    }))
+  },
 }))
 
 // Lets the screenshot harness drive the scene into a given state.

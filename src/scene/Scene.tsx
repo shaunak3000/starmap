@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import { useStarmap } from '../state/store.ts'
 import { CameraRig } from './CameraRig.tsx'
+import { ConstellationLines } from './ConstellationLines.tsx'
+import { ConstellationMembers } from './ConstellationMembers.tsx'
 import { DistanceGrid } from './DistanceGrid.tsx'
 import { StarField } from './StarField.tsx'
 import { Sun } from './Sun.tsx'
@@ -25,6 +27,8 @@ export function Scene() {
         {catalog && <StarField tier={catalog.t0} />}
         {catalog && <StarField tier={catalog.t1} sizeScale={0.85} />}
         {fieldTier && <StarField tier={fieldTier} sizeScale={0.7} visible={showFaintField} />}
+        <ConstellationLines />
+        <ConstellationMembers />
         <DistanceGrid />
       </group>
 
