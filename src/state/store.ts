@@ -79,6 +79,8 @@ interface StarmapState {
   flySpeed: number
   /** Live camera distance from the Sun, mirrored out of the rig for the HUD. */
   cameraDistancePc: number
+  /** Rolling frame rate, published by FrameMeter. */
+  fps: number
 
   init: () => Promise<void>
   enableFaintField: () => Promise<void>
@@ -127,6 +129,7 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   focusRequest: null,
   flySpeed: 5,
   cameraDistancePc: 60,
+  fps: 0,
 
   init: async () => {
     set({ loading: true, error: null })

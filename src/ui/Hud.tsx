@@ -18,6 +18,7 @@ export function Hud() {
   const activeConstellation = useStarmap((state) => state.activeConstellation)
   const showFaintField = useStarmap((state) => state.showFaintField)
   const fieldTier = useStarmap((state) => state.fieldTier)
+  const fps = useStarmap((state) => state.fps)
 
   if (!catalog) return null
 
@@ -35,6 +36,12 @@ export function Hud() {
       <div>
         <span className="hud-figure">{rendered.toLocaleString()}</span> stars ·{' '}
         <span className="hud-figure">{format(cameraDistancePc, unit)}</span> from the Sun
+        {fps > 0 && (
+          <>
+            {' · '}
+            <span className="hud-figure">{fps}</span> fps
+          </>
+        )}
       </div>
       {active && (
         <div>

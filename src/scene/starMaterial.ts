@@ -58,6 +58,7 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float uSaturation;
   uniform float uDissolve;      // 0 = celestial sphere, 1 = true distances
   uniform float uSphereRadius;
+  uniform float uIntensityScale;
 
   attribute float aAbsMag;
   attribute float aColorIndex;
@@ -107,7 +108,11 @@ const VERTEX_SHADER = /* glsl */ `
     }
 
     float size = clamp(rawSize, uMinSize, uMaxSize);
-    float intensity = uExposure;
+
+    // Per-tier trim. Nearly two million additive sprites sum to white however
+    // correct each one is on its own, so the faint field is deliberately held
+    // down to read as texture behind the stars that matter.
+    float intensity = uExposure * uIntensityScale;
 
     if (rawSize < uMinSize) {
       // Below a pixel we cannot shrink further, so shed the surplus area as
@@ -178,6 +183,7 @@ export function createStarMaterial(options: StarMaterialOptions = {}): THREE.Sha
       uMapRefAbsMag: { value: 5.0 },
       uMaxDistancePc: { value: 1000 },
       uSaturation: { value: 1.55 },
+      uIntensityScale: { value: 1 },
       uDissolve: { value: 1 },
       uSphereRadius: { value: 120 },
       uFalloff: { value: 4.5 },

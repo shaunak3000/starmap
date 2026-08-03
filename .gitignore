@@ -13,3 +13,6 @@ public/catalog/
 .vscode/*
 !.vscode/extensions.json
 *.log
+
+# Screenshots from the review harness
+shots/

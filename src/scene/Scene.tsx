@@ -5,6 +5,7 @@ import { CameraRig } from './CameraRig.tsx'
 import { ConstellationLines } from './ConstellationLines.tsx'
 import { ConstellationMembers } from './ConstellationMembers.tsx'
 import { DistanceGrid } from './DistanceGrid.tsx'
+import { FrameMeter } from './FrameMeter.tsx'
 import { Picking } from './Picking.tsx'
 import { SelectionMarker } from './SelectionMarker.tsx'
 import { StarField } from './StarField.tsx'
@@ -25,11 +26,22 @@ export function Scene() {
     <>
       <CameraRig />
       <Picking />
+      <FrameMeter />
 
       <group matrixAutoUpdate={false} matrix={matrix}>
         {catalog && <StarField tier={catalog.t0} />}
         {catalog && <StarField tier={catalog.t1} sizeScale={0.85} />}
-        {fieldTier && <StarField tier={fieldTier} sizeScale={0.7} visible={showFaintField} />}
+        {fieldTier && (
+          <StarField
+            tier={fieldTier}
+            sizeScale={0.7}
+            // 1.77M sprites: held right down, and trimmed further in map mode
+            // where every one of them draws at full size regardless of distance.
+            intensityScale={0.28}
+            mapSizeScale={0.45}
+            visible={showFaintField}
+          />
+        )}
         <ConstellationLines />
         <ConstellationMembers />
         <SelectionMarker />
