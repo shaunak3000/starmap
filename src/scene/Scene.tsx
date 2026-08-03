@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { OrbitControls } from '@react-three/drei'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import { useStarmap } from '../state/store.ts'
+import { CameraRig } from './CameraRig.tsx'
 import { DistanceGrid } from './DistanceGrid.tsx'
 import { StarField } from './StarField.tsx'
 import { Sun } from './Sun.tsx'
@@ -13,21 +13,13 @@ export function Scene() {
   const showFaintField = useStarmap((state) => state.showFaintField)
   const frame = useStarmap((state) => state.frame)
   const bloom = useStarmap((state) => state.bloom)
+  const cameraMode = useStarmap((state) => state.cameraMode)
 
   const matrix = useMemo(() => frameMatrix(frame), [frame])
 
   return (
     <>
-      <OrbitControls
-        makeDefault
-        enablePan={false}
-        enableDamping
-        dampingFactor={0.08}
-        rotateSpeed={0.45}
-        zoomSpeed={0.9}
-        minDistance={0.05}
-        maxDistance={6000}
-      />
+      <CameraRig />
 
       <group matrixAutoUpdate={false} matrix={matrix}>
         {catalog && <StarField tier={catalog.t0} />}
@@ -36,7 +28,8 @@ export function Scene() {
         <DistanceGrid />
       </group>
 
-      <Sun />
+      {/* In planetarium mode you are standing on it, so the marker only gets in the way. */}
+      {cameraMode !== 'earth' && <Sun />}
 
       {bloom > 0 && (
         <EffectComposer>

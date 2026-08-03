@@ -22,6 +22,16 @@ export interface Selection {
   index: number
 }
 
+/**
+ * A request for the camera to travel somewhere, in catalogue (data-space)
+ * coordinates. The token lets the rig notice repeat requests for the same spot.
+ */
+export interface FocusRequest {
+  position: [number, number, number]
+  distance: number
+  token: number
+}
+
 interface StarmapState {
   catalog: LoadedCatalog | null
   loading: boolean
@@ -55,11 +65,18 @@ interface StarmapState {
   /** 0 = figure projected on the celestial sphere, 1 = true 3D positions. */
   dissolve: number
 
+  focusRequest: FocusRequest | null
+  /** Metres-per-second equivalent for fly mode, in parsecs per second. */
+  flySpeed: number
+  /** Live camera distance from the Sun, mirrored out of the rig for the HUD. */
+  cameraDistancePc: number
+
   init: () => Promise<void>
   enableFaintField: () => Promise<void>
   set: <K extends keyof StarmapState>(key: K, value: StarmapState[K]) => void
   select: (index: number | null) => void
   setActiveConstellation: (id: string | null) => void
+  focusOn: (position: [number, number, number], distance?: number) => void
 }
 
 export const useStarmap = create<StarmapState>((set, get) => ({
@@ -88,6 +105,10 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   hovered: null,
   activeConstellation: null,
   dissolve: 0,
+
+  focusRequest: null,
+  flySpeed: 5,
+  cameraDistancePc: 60,
 
   init: async () => {
     set({ loading: true, error: null })
@@ -130,6 +151,15 @@ export const useStarmap = create<StarmapState>((set, get) => ({
       activeConstellation: id,
       // Leaving a constellation snaps the figure back together.
       dissolve: id === null ? 0 : state.dissolve,
+    })),
+
+  focusOn: (position, distance = 4) =>
+    set((state) => ({
+      focusRequest: {
+        position,
+        distance,
+        token: (state.focusRequest?.token ?? 0) + 1,
+      },
     })),
 }))
 
