@@ -30,6 +30,7 @@
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.185.3",
     "@vitejs/plugin-react": "^6.0.5",
+    "playwright": "^1.62.1",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",

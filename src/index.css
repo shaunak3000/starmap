@@ -30,3 +30,38 @@ canvas {
   display: block;
   touch-action: none;
 }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  text-align: center;
+}
+
+.overlay-title {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.overlay-detail {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.hud {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  pointer-events: none;
+}
