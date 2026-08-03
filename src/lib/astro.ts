@@ -75,6 +75,23 @@ export function equatorialToGalactic([x, y, z]: Vec3): Vec3 {
   ]
 }
 
+/** Inverse of {@link equatorialToGalactic}; the matrix is orthonormal, so transpose. */
+export function galacticToEquatorial([x, y, z]: Vec3): Vec3 {
+  const m = EQUATORIAL_TO_GALACTIC
+  return [
+    m[0] * x + m[3] * y + m[6] * z,
+    m[1] * x + m[4] * y + m[7] * z,
+    m[2] * x + m[5] * y + m[8] * z,
+  ]
+}
+
+/**
+ * Sun to Galactic Centre, in parsecs. Reid et al. (2019) adopt 8.15 kpc, which
+ * is also the frame their spiral-arm fit is expressed in — so the galaxy model
+ * and this constant have to stay together.
+ */
+export const R_SUN_PC = 8150
+
 /** Apparent magnitude of a star of absolute magnitude `absmag` seen from `distPc`. */
 export function apparentMagnitude(absMag: number, distPc: number): number {
   return absMag + 5 * Math.log10(Math.max(distPc, 1e-6) / 10)

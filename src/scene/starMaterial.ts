@@ -190,10 +190,11 @@ export function createStarMaterial(options: StarMaterialOptions = {}): THREE.Sha
     },
     transparent: true,
     blending: THREE.AdditiveBlending,
-    // Additive points must not occlude one another, but should still be hidden
-    // by opaque geometry, so test depth without writing it.
+    // Nothing in this scene is opaque, so depth buys nothing — and switching it
+    // off frees the camera to span 0.02 pc to 30 kpc without depth precision
+    // becoming the limiting factor.
     depthWrite: false,
-    depthTest: true,
+    depthTest: false,
   })
 }
 

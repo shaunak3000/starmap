@@ -16,16 +16,20 @@ import { frameMatrix } from './frame.ts'
  */
 
 const MIN_DISTANCE_PC = 0.02
-const MAX_DISTANCE_PC = 8000
+/** Far enough out to hold the whole modelled Galaxy in frame. */
+const MAX_DISTANCE_PC = 60000
 const MIN_FOV = 12
 const MAX_FOV = 85
 const DEFAULT_FOV = 60
 const PITCH_LIMIT = Math.PI / 2 - 0.001
 
-/** Exponential approach rates, in units of "e-folds per second". */
-const ROTATE_DAMPING = 14
-const DISTANCE_DAMPING = 7
-const TARGET_DAMPING = 6
+/** Exponential approach rates, in e-folds per second. */
+const ROTATE_DAMPING = 18
+const DISTANCE_DAMPING = 13
+const TARGET_DAMPING = 13
+/** Slower rates while a scripted flight is in progress, so travel reads as travel. */
+const FLIGHT_DAMPING = 3.2
+const FLIGHT_DURATION_MS = 2200
 
 interface RigState {
   yaw: number
@@ -55,31 +59,37 @@ export function CameraRig() {
   const focusRequest = useStarmap((state) => state.focusRequest)
   const flySpeed = useStarmap((state) => state.flySpeed)
 
-  // Starting yaw of pi puts the camera on +z looking back at the Sun, matching
-  // the initial camera in App.
-  const desired = useRef<RigState>({
+  // Starting yaw of pi puts the camera on +z looking back at the Sun.
+  const initial = (): RigState => ({
     yaw: Math.PI,
     pitch: 0,
     target: new THREE.Vector3(0, 0, 0),
     distance: 60,
     fov: DEFAULT_FOV,
   })
-  const actual = useRef<RigState>({
-    yaw: Math.PI,
-    pitch: 0,
-    target: new THREE.Vector3(0, 0, 0),
-    distance: 60,
-    fov: DEFAULT_FOV,
-  })
+
+  const desired = useRef<RigState>(initial())
+  const actual = useRef<RigState>(initial())
 
   /** Distance to restore when leaving a zero-distance mode. */
   const lastOrbitDistance = useRef(60)
   const keys = useRef(new Set<string>())
   const modeRef = useRef(cameraMode)
   const speedRef = useRef(flySpeed)
+  const cameraRef = useRef(camera)
+  /** Scripted flights damp slower than hand input; this is when one ends. */
+  const flightUntil = useRef(0)
 
   modeRef.current = cameraMode
   speedRef.current = flySpeed
+  cameraRef.current = camera
+
+  // Exposed for the input-check harness; screenshots cannot tell whether pan
+  // and dolly actually moved the camera.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    useStarmap.setState({ __camera: camera } as never)
+  }, [camera])
 
   const scratch = useMemo(
     () => ({
@@ -88,6 +98,7 @@ export function CameraRig() {
       up: new THREE.Vector3(),
       move: new THREE.Vector3(),
       world: new THREE.Vector3(),
+      ray: new THREE.Vector3(),
       worldUp: new THREE.Vector3(0, 1, 0),
     }),
     [],
@@ -99,70 +110,141 @@ export function CameraRig() {
   // Pointer, wheel and key input.
   useEffect(() => {
     const element = gl.domElement
-    let dragging = false
+    let drag: 'none' | 'rotate' | 'pan' = 'none'
     let lastX = 0
     let lastY = 0
+    let pointerX = 0
+    let pointerY = 0
+
+    const panAllowed = () => modeRef.current !== 'earth'
 
     const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return
-      dragging = true
       lastX = event.clientX
       lastY = event.clientY
+
+      // Right or middle drag pans; shift-left does too, for one-button mice.
+      const wantsPan = event.button === 1 || event.button === 2 || event.shiftKey
+      if (wantsPan) {
+        if (!panAllowed()) return
+        drag = 'pan'
+      } else if (event.button === 0) {
+        drag = 'rotate'
+      } else {
+        return
+      }
+
       element.setPointerCapture(event.pointerId)
     }
 
     const onPointerMove = (event: PointerEvent) => {
-      if (!dragging) return
+      const rect = element.getBoundingClientRect()
+      pointerX = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      pointerY = -(((event.clientY - rect.top) / rect.height) * 2 - 1)
+
+      if (drag === 'none') return
+
       const dx = event.clientX - lastX
       const dy = event.clientY - lastY
       lastX = event.clientX
       lastY = event.clientY
 
-      // Scale by field of view so a zoomed-in planetarium view pans slowly.
-      const sensitivity = 0.0026 * (actual.current.fov / DEFAULT_FOV)
       const state = desired.current
 
-      // Orbiting reads naturally when dragging pulls the sky the other way.
-      const sign = modeRef.current === 'orbit' ? 1 : -1
-      state.yaw += dx * sensitivity * sign
-      state.pitch = Math.max(
-        -PITCH_LIMIT,
-        Math.min(PITCH_LIMIT, state.pitch + dy * sensitivity * sign),
-      )
+      if (drag === 'rotate') {
+        // Scale by field of view so a zoomed-in planetarium view pans slowly.
+        const sensitivity = 0.0026 * (actual.current.fov / DEFAULT_FOV)
+        // Orbiting reads naturally when dragging pulls the sky the other way.
+        const sign = modeRef.current === 'orbit' ? 1 : -1
+        state.yaw += dx * sensitivity * sign
+        state.pitch = Math.max(
+          -PITCH_LIMIT,
+          Math.min(PITCH_LIMIT, state.pitch + dy * sensitivity * sign),
+        )
+        return
+      }
+
+      // Pan: slide the focus point across the view plane. The world distance
+      // per pixel is set by how much of the scene the frustum spans at the
+      // focus depth, so panning feels the same at every zoom level.
+      const depth = Math.max(actual.current.distance, MIN_DISTANCE_PC)
+      const worldPerPixel =
+        (2 * depth * Math.tan((actual.current.fov * Math.PI) / 360)) / element.clientHeight
+
+      look(actual.current.yaw, actual.current.pitch, scratch.dir)
+      scratch.right.crossVectors(scratch.dir, scratch.worldUp).normalize()
+      scratch.up.crossVectors(scratch.right, scratch.dir).normalize()
+
+      scratch.move
+        .set(0, 0, 0)
+        .addScaledVector(scratch.right, -dx * worldPerPixel)
+        .addScaledVector(scratch.up, dy * worldPerPixel)
+        .applyMatrix4(worldToData)
+
+      state.target.add(scratch.move)
+      // Hand input should not inherit a flight's slow damping.
+      flightUntil.current = 0
     }
 
     const onPointerUp = (event: PointerEvent) => {
-      dragging = false
+      drag = 'none'
       if (element.hasPointerCapture(event.pointerId)) {
         element.releasePointerCapture(event.pointerId)
       }
     }
 
+    const onContextMenu = (event: MouseEvent) => event.preventDefault()
+
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       const state = desired.current
 
+      // Trackpads emit a stream of small deltas and mice a few large ones;
+      // clamping keeps one gesture from covering five orders of magnitude.
+      const step = Math.max(-220, Math.min(220, event.deltaY))
+
       if (modeRef.current === 'earth') {
         // Planetarium zoom is a focal-length change, not a move.
-        state.fov = Math.max(MIN_FOV, Math.min(MAX_FOV, state.fov * Math.exp(event.deltaY * 0.0012)))
+        state.fov = Math.max(MIN_FOV, Math.min(MAX_FOV, state.fov * Math.exp(step * 0.0016)))
         return
       }
 
       if (modeRef.current === 'fly') {
         useStarmap.setState({
-          flySpeed: Math.max(0.05, Math.min(500, speedRef.current * Math.exp(-event.deltaY * 0.0015))),
+          flySpeed: Math.max(0.05, Math.min(2000, speedRef.current * Math.exp(-step * 0.0016))),
         })
         return
       }
 
-      // Exponential dolly: one wheel notch covers the same *ratio* of distance
-      // whether you are 0.1 pc or 3000 pc out, which is the only way a single
-      // control spans five orders of magnitude.
-      state.distance = Math.max(
+      // Exponential dolly: one notch covers the same *ratio* of distance at
+      // 0.1 pc as at 30 kpc, which is the only way one control spans six
+      // orders of magnitude.
+      const before = state.distance
+      const after = Math.max(
         MIN_DISTANCE_PC,
-        Math.min(MAX_DISTANCE_PC, state.distance * Math.exp(event.deltaY * 0.0011)),
+        Math.min(MAX_DISTANCE_PC, before * Math.exp(step * 0.0022)),
       )
-      lastOrbitDistance.current = state.distance
+      state.distance = after
+      lastOrbitDistance.current = after
+      flightUntil.current = 0
+
+      // Zoom toward the cursor rather than the orbit centre: shifting the focus
+      // by (before - after) * (cursorRay - viewDir) keeps whatever is under the
+      // pointer pinned in place while the camera closes in.
+      const view = cameraRef.current
+      scratch.ray
+        .set(pointerX, pointerY, 0.5)
+        .unproject(view)
+        .sub(view.position)
+        .normalize()
+
+      look(actual.current.yaw, actual.current.pitch, scratch.dir)
+      scratch.move
+        .copy(scratch.ray)
+        .sub(scratch.dir)
+        .multiplyScalar(before - after)
+        .applyMatrix4(worldToData)
+
+      state.target.add(scratch.move)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -176,6 +258,7 @@ export function CameraRig() {
     element.addEventListener('pointermove', onPointerMove)
     element.addEventListener('pointerup', onPointerUp)
     element.addEventListener('pointercancel', onPointerUp)
+    element.addEventListener('contextmenu', onContextMenu)
     element.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -186,12 +269,13 @@ export function CameraRig() {
       element.removeEventListener('pointermove', onPointerMove)
       element.removeEventListener('pointerup', onPointerUp)
       element.removeEventListener('pointercancel', onPointerUp)
+      element.removeEventListener('contextmenu', onContextMenu)
       element.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [gl])
+  }, [gl, scratch, worldToData])
 
   // Mode changes only retarget; the damping loop makes them continuous.
   useEffect(() => {
@@ -221,6 +305,7 @@ export function CameraRig() {
     state.target.set(...focusRequest.position)
     state.distance = Math.max(focusRequest.distance, MIN_DISTANCE_PC)
     lastOrbitDistance.current = state.distance
+    flightUntil.current = performance.now() + FLIGHT_DURATION_MS
 
     if (focusRequest.lookFrom) {
       // The request names where the camera should stand relative to the target;
@@ -256,6 +341,10 @@ export function CameraRig() {
     const goal = desired.current
     const now = actual.current
 
+    const flying = performance.now() < flightUntil.current
+    const moveDamping = flying ? FLIGHT_DAMPING : TARGET_DAMPING
+    const zoomDamping = flying ? FLIGHT_DAMPING : DISTANCE_DAMPING
+
     if (cameraMode === 'fly') {
       const pressed = keys.current
       const forward = (pressed.has('KeyW') ? 1 : 0) - (pressed.has('KeyS') ? 1 : 0)
@@ -278,10 +367,9 @@ export function CameraRig() {
           .addScaledVector(scratch.up, rise)
 
         if (scratch.move.lengthSq() > 0) {
-          scratch.move.normalize().multiplyScalar(step)
           // Movement is authored in world space but the target lives in data
           // space, so undo the frame rotation before applying it.
-          scratch.move.applyMatrix4(worldToData)
+          scratch.move.normalize().multiplyScalar(step).applyMatrix4(worldToData)
           goal.target.add(scratch.move)
         }
       }
@@ -291,15 +379,14 @@ export function CameraRig() {
     now.pitch = damp(now.pitch, goal.pitch, ROTATE_DAMPING, dt)
     now.fov = damp(now.fov, goal.fov, DISTANCE_DAMPING, dt)
 
-    // Distance is interpolated in log space so a trip from 3000 pc to 0.5 pc
+    // Distance is interpolated in log space so a trip from 30 kpc to 0.5 pc
     // feels uniform instead of crawling for the last hundredth.
     const from = Math.max(now.distance, 1e-5)
     const to = Math.max(goal.distance, 1e-5)
-    const logged = damp(Math.log(from), Math.log(to), DISTANCE_DAMPING, dt)
+    const logged = damp(Math.log(from), Math.log(to), zoomDamping, dt)
     now.distance = goal.distance <= 1e-5 && from < 1e-3 ? goal.distance : Math.exp(logged)
 
-    const targetAlpha = 1 - Math.exp(-TARGET_DAMPING * dt)
-    now.target.lerp(goal.target, targetAlpha)
+    now.target.lerp(goal.target, 1 - Math.exp(-moveDamping * dt))
 
     look(now.yaw, now.pitch, scratch.dir)
     scratch.world.copy(now.target).applyMatrix4(dataToWorld)
@@ -311,12 +398,16 @@ export function CameraRig() {
       camera.position.z + scratch.dir.z,
     )
 
-    // Near plane has to track the scale being viewed, or standing 0.05 pc from
-    // a star clips it away while a 3000 pc overview z-fights.
-    const near = Math.max(1e-4, Math.min(1, Math.max(now.distance, 0.02) * 5e-4))
-    if (camera.fov !== now.fov || camera.near !== near) {
+    // Both planes track the scale being viewed: standing 0.05 pc from a star
+    // needs a tiny near plane, while a 30 kpc overview needs a far plane past
+    // the whole modelled Galaxy. Everything drawn is additive with depth
+    // testing off, so the resulting huge near/far ratio costs nothing.
+    const near = Math.max(1e-4, Math.min(20, Math.max(now.distance, 0.02) * 5e-4))
+    const far = Math.max(now.distance * 8, 120000)
+    if (camera.fov !== now.fov || camera.near !== near || camera.far !== far) {
       camera.fov = now.fov
       camera.near = near
+      camera.far = far
       camera.updateProjectionMatrix()
     }
 

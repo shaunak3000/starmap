@@ -19,6 +19,8 @@ export function Hud() {
   const showFaintField = useStarmap((state) => state.showFaintField)
   const fieldTier = useStarmap((state) => state.fieldTier)
   const fps = useStarmap((state) => state.fps)
+  const showGrid = useStarmap((state) => state.showGrid)
+  const gridStepPc = useStarmap((state) => state.gridStepPc)
 
   if (!catalog) return null
 
@@ -40,6 +42,12 @@ export function Hud() {
           <>
             {' · '}
             <span className="hud-figure">{fps}</span> fps
+          </>
+        )}
+        {showGrid && (
+          <>
+            {' · grid '}
+            <span className="hud-figure">{format(gridStepPc, unit)}</span>
           </>
         )}
       </div>

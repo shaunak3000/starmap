@@ -44,6 +44,7 @@ function createLineMaterial(color: string, opacity: number): THREE.ShaderMateria
     },
     transparent: true,
     depthWrite: false,
+    depthTest: false,
     blending: THREE.AdditiveBlending,
   })
 }
@@ -77,6 +78,7 @@ export function ConstellationLines() {
   const dissolve = useStarmap((state) => state.dissolve)
   const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
   const active = useStarmap((state) => state.activeConstellation)
+  const isolate = useStarmap((state) => state.isolate)
 
   const all = useMemo(() => {
     if (!catalog) return null
@@ -112,9 +114,12 @@ export function ConstellationLines() {
 
   if (!show || !all) return null
 
+  // Isolating a figure means dropping the other 87 entirely, not just dimming.
+  const showAll = !(isolate && active)
+
   return (
     <>
-      <lineSegments geometry={all} material={baseMaterial} frustumCulled={false} />
+      {showAll && <lineSegments geometry={all} material={baseMaterial} frustumCulled={false} />}
       {highlighted && (
         <lineSegments geometry={highlighted} material={activeMaterial} frustumCulled={false} />
       )}

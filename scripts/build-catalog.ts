@@ -29,8 +29,15 @@ import { collectConstellationHips, parseStellariumSkyCulture } from './constella
 import { GrowableFloat32, GrowableUint32 } from './growable.ts'
 import { ATTRIBUTION, OUT_DIR, RAW_DIR } from './sources.ts'
 
-/** Everything inside this radius is kept; constellation stars are exempt. */
-const MAX_DISTANCE_PC = 1000
+/**
+ * Everything inside this radius is kept; constellation stars are exempt.
+ *
+ * 3 kpc is roughly where Gaia DR3 parallaxes stop being defensible for ordinary
+ * stars. Past it the catalogue thins from tens of thousands per kiloparsec shell
+ * to a few hundred — that is the survey running out of precision, not the Galaxy
+ * ending, so anything beyond is modelled rather than plotted.
+ */
+const MAX_DISTANCE_PC = 3000
 
 /** HYG-lineage catalogues use a huge sentinel distance for "parallax unusable". */
 const DISTANCE_SENTINEL_PC = 100000

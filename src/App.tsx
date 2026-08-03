@@ -44,7 +44,7 @@ export default function App() {
   return (
     <>
       <Canvas
-        camera={{ fov: 60, near: 0.01, far: 20000, position: [0, 0, 60] }}
+        camera={{ fov: 60, near: 0.01, far: 120000, position: [0, 0, 60] }}
         gl={{
           antialias: true,
           // Stars are additive point sprites with a huge dynamic range; filmic

@@ -42,7 +42,7 @@ export function Sidebar() {
       <div className="sidebar-scroll">
         <div className="brand">
           <span className="brand-name">starmap</span>
-          <span className="brand-sub">1000 pc</span>
+          <span className="brand-sub">3 kpc</span>
         </div>
 
         <Section title="Viewpoint">
@@ -61,6 +61,17 @@ export function Sidebar() {
               : state.cameraMode === 'fly'
                 ? 'WASD to move, Q/E for up and down, Shift to boost, scroll for speed.'
                 : 'Drag to orbit, scroll to dolly in and out.'}
+          </p>
+        </Section>
+
+        <Section title="Scale">
+          <button type="button" className="button" onClick={() => state.viewGalaxy()}>
+            View the whole Galaxy
+          </button>
+          <p className="hint">
+            Flies out to 30 kpc, face-on. The catalogue only reaches 3 kpc, so
+            the disk and arms out there are a model — the real stars are the
+            small bright knot around the Sun.
           </p>
         </Section>
 
@@ -135,9 +146,19 @@ export function Sidebar() {
             onChange={(value) => state.set('showLabels', value)}
           />
           <Toggle
-            label="Distance rings"
+            label="XYZ grid"
             checked={state.showGrid}
             onChange={(value) => state.set('showGrid', value)}
+          />
+          <Toggle
+            label="Milky Way (model)"
+            checked={state.showGalaxy}
+            onChange={(value) => state.set('showGalaxy', value)}
+          />
+          <Toggle
+            label="Isolate selection"
+            checked={state.isolate}
+            onChange={(value) => state.set('isolate', value)}
           />
           <Toggle
             label={
@@ -210,8 +231,11 @@ export function Sidebar() {
         </Section>
 
         <p className="credit">
-          Stars: AT-HYG v4 (Gaia DR3 + Hipparcos). Figures: Stellarium. Distances
-          for luminous supergiants carry real uncertainty.
+          Stars: AT-HYG v4 (Gaia DR3 + Hipparcos), real out to 3,000 pc. The
+          Milky Way layer is a <em>model</em> — spiral arms from the Reid et al.
+          (2019) maser parallax fit — because the catalogue holds only a few
+          hundred stars at the Galactic Centre’s distance. Supergiant distances
+          carry real uncertainty.
         </p>
       </div>
     </aside>

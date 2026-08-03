@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "data:fetch": "tsx scripts/fetch-athyg.ts",
     "data:build": "tsx scripts/build-catalog.ts",
-    "data": "npm run data:fetch && npm run data:build"
+    "data": "npm run data:fetch && npm run data:build",
+    "check:camera": "tsx scripts/check-camera.ts",
+    "shoot": "tsx scripts/shoot.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

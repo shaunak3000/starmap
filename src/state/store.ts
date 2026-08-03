@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { CatalogTier } from '../lib/catalog-format.ts'
 import { type LoadedCatalog, loadCatalog, loadTier } from '../lib/catalog-loader.ts'
 import { constellationVantage } from '../lib/constellation-view.ts'
+import { galacticToEquatorial } from '../lib/astro.ts'
+import { galacticCentre } from '../lib/galaxy.ts'
 
 /**
  * How star size is derived.
@@ -60,6 +62,12 @@ interface StarmapState {
   showGrid: boolean
   showFaintField: boolean
   showLabels: boolean
+  /** Schematic Milky Way: modelled structure, not catalogue data. */
+  showGalaxy: boolean
+  /** Hide everything except the current selection. */
+  isolate: boolean
+  /** Current grid cell size in parsecs, published by AxisGrid. */
+  gridStepPc: number
 
   selection: Selection | null
   hovered: number | null
@@ -94,6 +102,8 @@ interface StarmapState {
   ) => void
   /** Flies side-on to a figure and expands it to true distances. */
   revealConstellation: (id: string) => void
+  /** Flies to a face-on view of the modelled Galaxy, centred on the Centre. */
+  viewGalaxy: () => void
 }
 
 export const useStarmap = create<StarmapState>((set, get) => ({
@@ -111,12 +121,15 @@ export const useStarmap = create<StarmapState>((set, get) => ({
 
   exposure: 1,
   bloom: 0.6,
-  maxDistancePc: 1000,
+  maxDistancePc: 3000,
 
   showConstellations: true,
   showGrid: false,
   showFaintField: false,
   showLabels: true,
+  showGalaxy: false,
+  isolate: false,
+  gridStepPc: 10,
 
   selection: null,
   hovered: null,
@@ -172,6 +185,26 @@ export const useStarmap = create<StarmapState>((set, get) => ({
       activeConstellation: id,
       // Leaving a constellation snaps the figure back together.
       dissolve: id === null ? 0 : state.dissolve,
+    })),
+
+  viewGalaxy: () =>
+    set((state) => ({
+      showGalaxy: true,
+      cameraMode: 'orbit',
+      // Map mode sizes every star the same regardless of range, which at 30 kpc
+      // turns the whole 3 kpc catalogue into one saturated blob. Apparent mode
+      // lets distance do its work, so the real stars read as the small knot
+      // around the Sun that they are.
+      sizeMode: 'apparent',
+      // Centring on the Centre rather than the Sun is the point: it puts us
+      // 8.15 kpc out on a minor arm rather than at the middle of anything.
+      focusRequest: {
+        position: galacticCentre(),
+        distance: 30000,
+        // Straight down the north galactic pole, so the arms read face-on.
+        lookFrom: galacticToEquatorial([0, 0, 1]),
+        token: (state.focusRequest?.token ?? 0) + 1,
+      },
     })),
 
   focusOn: (position, distance = 4, lookFrom) =>

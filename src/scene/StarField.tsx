@@ -5,7 +5,7 @@ import { useStarmap } from '../state/store.ts'
 import { createStarGeometry, createStarMaterial } from './starMaterial.ts'
 
 /** Slider maximum; at or above this the distance filter is switched off entirely. */
-export const DISTANCE_FILTER_MAX_PC = 1000
+export const DISTANCE_FILTER_MAX_PC = 3000
 
 /**
  * Default radius of the shell stars collapse onto at dissolve 0, used until a

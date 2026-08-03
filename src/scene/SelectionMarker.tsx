@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { FIELDS_PER_STAR } from '../lib/catalog-format.ts'
@@ -43,10 +43,41 @@ export function SelectionMarker() {
     return renderedPosition(catalog.t0.attributes, selection.index, dissolve, sphereRadiusPc)
   }, [catalog, selection, dissolve, sphereRadiusPc])
 
+  const selectedGeometry = useMemo(() => {
+    if (!selectedPosition) return null
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(
+        [selectedPosition.x, selectedPosition.y, selectedPosition.z],
+        3,
+      ),
+    )
+    return geometry
+  }, [selectedPosition])
+
+  useEffect(() => () => selectedGeometry?.dispose(), [selectedGeometry])
+
   if (!catalog) return null
 
   return (
     <>
+      {/* Drawn explicitly so a selected star survives isolation, which hides
+          the tier it normally comes from. */}
+      {selectedGeometry && (
+        <points geometry={selectedGeometry} frustumCulled={false}>
+          <pointsMaterial
+            size={7}
+            sizeAttenuation={false}
+            color="#ffffff"
+            transparent
+            depthWrite={false}
+            depthTest={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </points>
+      )}
+
       {hoverPosition && hovered !== selection?.index && (
         <Html position={hoverPosition} center zIndexRange={[30, 0]} style={{ pointerEvents: 'none' }}>
           <div className="hover-tag">{starLabel(catalog.metaByIndex.get(hovered!))}</div>
