@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Raw catalog downloads — large, reproducible via `npm run data:fetch`
+data/raw/
+
+# Generated binary catalog tiers — reproducible via `npm run data:build`
+public/catalog/
+
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+*.log
