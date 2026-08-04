@@ -20,5 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  // Tests belong to the Node project (tsconfig.node.json), which has the node
+  // types they need; compiling them here as browser code fails on node: imports.
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }

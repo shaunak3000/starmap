@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { collectConstellationHips, parseStellariumSkyCulture } from './constellations.ts'
@@ -66,10 +66,18 @@ describe('collectConstellationHips', () => {
   })
 })
 
-// Guards against upstream restructuring the real file we pinned.
+// Guards against upstream restructuring the real file we pinned. Only runs
+// where the raw download exists — CI builds from the committed catalogue and
+// never fetches it. The read has to be lazy: `describe.runIf` still executes
+// the callback to collect tests, so an eager readFileSync throws even when the
+// suite is going to be skipped.
 const realSkyCulture = path.join(RAW_DIR, 'stellarium-modern.json')
 describe.runIf(fs.existsSync(realSkyCulture))('the pinned Stellarium sky culture', () => {
-  const parsed = parseStellariumSkyCulture(fs.readFileSync(realSkyCulture, 'utf8'))
+  let parsed: ReturnType<typeof parseStellariumSkyCulture>
+
+  beforeAll(() => {
+    parsed = parseStellariumSkyCulture(fs.readFileSync(realSkyCulture, 'utf8'))
+  })
 
   it('yields all 88 IAU constellations', () => {
     expect(parsed).toHaveLength(88)
