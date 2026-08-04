@@ -15,33 +15,69 @@
   border-radius: var(--panel-radius);
 }
 
-/* ---------------------------------------------------------------- sidebar */
+/* ----------------------------------------------------------------- panels */
 
-.sidebar {
+/*
+ * Two edge-anchored columns rather than one tall stack: the controls all fit on
+ * screen at once, so nothing has to be hunted for by scrolling. Only the
+ * 88-entry figure list scrolls, and only within itself.
+ */
+
+.panel-left,
+.panel-right {
   position: fixed;
   top: 1rem;
-  left: 1rem;
-  bottom: 1rem;
-  width: 17rem;
+  width: 15.5rem;
+  max-height: calc(100vh - 2rem);
+  /* Above every drei Html label, so scene text never bleeds over the chrome. */
+  z-index: 100;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  z-index: 10;
 }
 
-.sidebar-scroll {
+.panel-left {
+  left: 1rem;
+}
+
+.panel-right {
+  right: 1rem;
+  bottom: 1rem;
+  overflow: hidden;
+}
+
+.panel-scroll {
+  /* A fallback for very short viewports; at laptop height nothing scrolls. */
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0.9rem;
+  padding: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 1rem;
 }
 
-.sidebar-scroll::-webkit-scrollbar {
+.panel-fixed {
+  flex: none;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.panel-flex {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.panel-scroll::-webkit-scrollbar,
+.constellation-list::-webkit-scrollbar {
   width: 6px;
 }
-.sidebar-scroll::-webkit-scrollbar-thumb {
+.panel-scroll::-webkit-scrollbar-thumb,
+.constellation-list::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.14);
   border-radius: 3px;
 }
@@ -230,17 +266,12 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 13rem;
+  /* Fills whatever the panel has left rather than a fixed height. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-.constellation-list::-webkit-scrollbar {
-  width: 6px;
-}
-.constellation-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 3px;
+  padding-bottom: 0.3rem;
 }
 
 .constellation-row {
@@ -324,8 +355,9 @@
   top: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  width: min(22rem, calc(100vw - 22rem));
-  z-index: 10;
+  /* Sits in the gap between the two panels. */
+  width: min(24rem, calc(100vw - 36rem));
+  z-index: 100;
 }
 
 .search-input {
@@ -386,11 +418,12 @@
 
 .star-card {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
+  /* Clear of both columns: the right edge now belongs to the layers panel. */
+  left: 17.5rem;
+  bottom: 2.5rem;
   width: 15rem;
   padding: 0.85rem;
-  z-index: 10;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -514,9 +547,10 @@
 
 .hud {
   position: fixed;
-  /* Clear of the sidebar, which owns the full left edge. */
-  left: 19rem;
-  bottom: 1rem;
+  /* Runs along the bottom between the two columns. */
+  left: 17.5rem;
+  right: 17.5rem;
+  bottom: 0.6rem;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -525,7 +559,7 @@
   color: var(--fg-dim);
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
   pointer-events: none;
-  z-index: 5;
+  z-index: 90;
 }
 
 .hud-figure {
@@ -549,17 +583,36 @@
   color: inherit;
 }
 
-@media (max-width: 900px) {
-  .sidebar {
-    width: 14rem;
+@media (max-width: 1180px) {
+  .panel-left,
+  .panel-right {
+    width: 13.5rem;
   }
   .search {
-    width: min(18rem, calc(100vw - 16rem));
+    width: min(18rem, calc(100vw - 31rem));
   }
   .star-card {
-    width: 12.5rem;
+    left: 15.5rem;
+    width: 13rem;
   }
   .hud {
     left: 15.5rem;
+    right: 15.5rem;
+  }
+}
+
+/* Below this the two columns cannot coexist, so fall back to one scrolling
+   column and let the star card float over the canvas. */
+@media (max-width: 860px) {
+  .panel-right {
+    display: none;
+  }
+  .search {
+    width: min(18rem, calc(100vw - 17rem));
+  }
+  .star-card,
+  .hud {
+    left: 15.5rem;
+    right: 1rem;
   }
 }

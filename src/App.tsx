@@ -4,9 +4,10 @@ import * as THREE from 'three'
 import { Scene } from './scene/Scene.tsx'
 import { useStarmap } from './state/store.ts'
 import { Hud } from './ui/Hud.tsx'
+import { LayersPanel } from './ui/LayersPanel.tsx'
 import { SearchBox } from './ui/SearchBox.tsx'
-import { Sidebar } from './ui/Sidebar.tsx'
 import { StarCard } from './ui/StarCard.tsx'
+import { ViewPanel } from './ui/ViewPanel.tsx'
 
 function LoadState() {
   const loading = useStarmap((state) => state.loading)
@@ -72,7 +73,8 @@ export default function App() {
 
       {ready && (
         <>
-          <Sidebar />
+          <ViewPanel />
+          <LayersPanel />
           <SearchBox />
           <StarCard />
           <Hud />

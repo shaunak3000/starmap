@@ -1,15 +1,6 @@
-import { LY_PER_PC } from '../lib/astro.ts'
+import { formatDistance as format } from './format.ts'
 import { constellationSpread } from '../lib/constellation-view.ts'
 import { useStarmap } from '../state/store.ts'
-
-function format(pc: number, unit: 'pc' | 'ly'): string {
-  const value = unit === 'pc' ? pc : pc * LY_PER_PC
-  const suffix = unit === 'pc' ? 'pc' : 'ly'
-  if (value < 0.01) return `0 ${suffix}`
-  if (value < 10) return `${value.toFixed(2)} ${suffix}`
-  if (value < 1000) return `${value.toFixed(0)} ${suffix}`
-  return `${(value / 1000).toFixed(1)}k ${suffix}`
-}
 
 export function Hud() {
   const catalog = useStarmap((state) => state.catalog)
