@@ -30,12 +30,17 @@ export interface Selection {
  * coordinates. The token lets the rig notice repeat requests for the same spot.
  */
 export interface FocusRequest {
-  position: [number, number, number]
-  distance: number
+  /** Omit to keep the current focus point — used by view presets. */
+  position?: [number, number, number]
+  /** Omit to keep the current range. */
+  distance?: number
   /** Unit direction from the target toward the camera, in data space. */
   lookFrom?: [number, number, number]
   token: number
 }
+
+/** Canonical viewing angles, relative to whichever frame is active. */
+export type ViewPreset = 'top' | 'edge'
 
 interface StarmapState {
   catalog: LoadedCatalog | null
@@ -104,6 +109,10 @@ interface StarmapState {
   revealConstellation: (id: string) => void
   /** Flies to a face-on view of the modelled Galaxy, centred on the Centre. */
   viewGalaxy: () => void
+  /** Swings to a canonical angle without changing what is being looked at. */
+  orientView: (preset: ViewPreset) => void
+  /** Back to the opening view: standing on the Sun, looking out. */
+  resetView: () => void
 }
 
 export const useStarmap = create<StarmapState>((set, get) => ({
@@ -203,6 +212,34 @@ export const useStarmap = create<StarmapState>((set, get) => ({
         distance: 30000,
         // Straight down the north galactic pole, so the arms read face-on.
         lookFrom: galacticToEquatorial([0, 0, 1]),
+        token: (state.focusRequest?.token ?? 0) + 1,
+      },
+    })),
+
+  orientView: (preset) => {
+    const { frame } = get()
+    // "Top" means down the active frame's pole and "edge" means along its
+    // plane, so the same button does the astronomically useful thing whether
+    // you are thinking in equatorial or galactic terms.
+    const axis: [number, number, number] = preset === 'top' ? [0, 0, 1] : [0, 1, 0]
+    const lookFrom = frame === 'galactic' ? galacticToEquatorial(axis) : axis
+
+    set((state) => ({
+      focusRequest: { lookFrom, token: (state.focusRequest?.token ?? 0) + 1 },
+    }))
+  },
+
+  resetView: () =>
+    set((state) => ({
+      cameraMode: 'earth',
+      dissolve: 1,
+      isolate: false,
+      activeConstellation: null,
+      selection: null,
+      sphereRadiusPc: 120,
+      focusRequest: {
+        position: [0, 0, 0],
+        distance: 0,
         token: (state.focusRequest?.token ?? 0) + 1,
       },
     })),

@@ -151,10 +151,19 @@ export function CameraRig() {
       const state = desired.current
 
       if (drag === 'rotate') {
-        // Scale by field of view so a zoomed-in planetarium view pans slowly.
-        const sensitivity = 0.0026 * (actual.current.fov / DEFAULT_FOV)
-        // Orbiting reads naturally when dragging pulls the sky the other way.
-        const sign = modeRef.current === 'orbit' ? 1 : -1
+        // A full drag down the viewport turns 180 degrees, so the gesture means
+        // the same thing on any window size. Field of view scales it too, so a
+        // zoomed-in planetarium view tracks slowly.
+        const sensitivity =
+          (Math.PI / element.clientHeight) * (actual.current.fov / DEFAULT_FOV)
+
+        // Whatever you grab follows the mouse, in every mode. The arithmetic has
+        // to differ because orbit swings the camera *around* a target while
+        // Earth POV and fly pivot it in place: moving the camera right pushes
+        // the scene left, whereas turning in place pulls it right. Same felt
+        // behaviour, opposite sign.
+        const sign = modeRef.current === 'orbit' ? -1 : 1
+
         state.yaw += dx * sensitivity * sign
         state.pitch = Math.max(
           -PITCH_LIMIT,
@@ -302,10 +311,14 @@ export function CameraRig() {
   useEffect(() => {
     if (!focusRequest) return
     const state = desired.current
-    state.target.set(...focusRequest.position)
-    state.distance = Math.max(focusRequest.distance, MIN_DISTANCE_PC)
-    lastOrbitDistance.current = state.distance
     flightUntil.current = performance.now() + FLIGHT_DURATION_MS
+
+    // Position and range are optional: a view preset only changes the angle.
+    if (focusRequest.position) state.target.set(...focusRequest.position)
+    if (focusRequest.distance !== undefined) {
+      state.distance = Math.max(focusRequest.distance, MIN_DISTANCE_PC)
+      if (focusRequest.distance > 0) lastOrbitDistance.current = state.distance
+    }
 
     if (focusRequest.lookFrom) {
       // The request names where the camera should stand relative to the target;
@@ -330,7 +343,9 @@ export function CameraRig() {
 
     // Travelling somewhere implies wanting to look at it, so leave the
     // origin-locked planetarium view rather than silently ignoring the request.
-    if (useStarmap.getState().cameraMode === 'earth') {
+    // A bare angle change is not travel, so it leaves the mode alone.
+    const goingSomewhere = focusRequest.position !== undefined && (focusRequest.distance ?? 0) > 0
+    if (goingSomewhere && useStarmap.getState().cameraMode === 'earth') {
       useStarmap.setState({ cameraMode: 'orbit' })
     }
   }, [focusRequest, dataToWorld, scratch])

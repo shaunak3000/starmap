@@ -67,6 +67,127 @@ async function main() {
     if (!ok) failures.push(name)
   }
 
+  /**
+   * Screen position of a fixed world point. Rotation is only "correct" in terms
+   * of what the viewer sees move, so that is what gets asserted — checking that
+   * yaw merely changed would pass just as happily with the sign inverted.
+   */
+  const project = async (point: [number, number, number]) =>
+    (await page.evaluate(`(() => {
+      const THREE = window.__three
+      const c = window.__starmap.getState().__camera
+      const v = new THREE.Vector3(${point[0]}, ${point[1]}, ${point[2]}).project(c)
+      return { x: v.x, y: v.y }
+    })()`)) as { x: number; y: number }
+
+  /** Drags across the canvas and reports how a fixed point moved on screen. */
+  const dragAndTrack = async (
+    point: [number, number, number],
+    from: [number, number],
+    to: [number, number],
+  ) => {
+    const before = await project(point)
+    await page.mouse.move(from[0], from[1])
+    await page.mouse.down({ button: 'left' })
+    await page.mouse.move(to[0], to[1], { steps: 15 })
+    await page.mouse.up({ button: 'left' })
+    await settle()
+    const after = await project(point)
+    return { dx: after.x - before.x, dy: after.y - before.y }
+  }
+
+  await page.evaluate(`window.__starmap.getState().focusOn([0, 0, 0], 90)`)
+  await page.waitForTimeout(2600)
+
+  /**
+   * A world point placed in front of the camera and off to one side. Derived
+   * from the live camera rather than hand-picked: a point on the view axis
+   * barely moves under yaw, which silently makes the test meaningless.
+   */
+  const markerNear = async (): Promise<[number, number, number]> => {
+    const p = (await page.evaluate(`(() => {
+      const THREE = window.__three
+      const c = window.__starmap.getState().__camera
+      const fwd = new THREE.Vector3(); c.getWorldDirection(fwd)
+      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize()
+      const up = new THREE.Vector3().crossVectors(right, fwd).normalize()
+      const d = Math.max(c.position.length(), 10)
+      const v = c.position.clone()
+        .addScaledVector(fwd, d)
+        .addScaledVector(right, d * 0.25)
+        .addScaledVector(up, d * 0.25)
+      return { x: v.x, y: v.y, z: v.z }
+    })()`)) as { x: number; y: number; z: number }
+    return [p.x, p.y, p.z]
+  }
+
+  const marker = await markerNear()
+
+  void marker
+
+  /**
+   * Orbit is measured on the camera itself, not on a marker. Orbiting swings
+   * the camera around a fixed target, so a point at target depth sweeps sideways
+   * whichever way you drag — it cannot tell the two apart. The convention that
+   * *can* be stated unambiguously, and the one three.js OrbitControls uses, is
+   * that dragging right carries the camera around to its own left.
+   */
+  const dragAndTrackCamera = async (
+    from: [number, number],
+    to: [number, number],
+  ): Promise<{ alongRight: number; alongUp: number }> => {
+    const basis = (await page.evaluate(`(() => {
+      const THREE = window.__three
+      const c = window.__starmap.getState().__camera
+      const fwd = new THREE.Vector3(); c.getWorldDirection(fwd)
+      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize()
+      const up = new THREE.Vector3().crossVectors(right, fwd).normalize()
+      return { p: c.position.toArray(), right: right.toArray(), up: up.toArray() }
+    })()`)) as { p: number[]; right: number[]; up: number[] }
+
+    await page.mouse.move(from[0], from[1])
+    await page.mouse.down({ button: 'left' })
+    await page.mouse.move(to[0], to[1], { steps: 15 })
+    await page.mouse.up({ button: 'left' })
+    await settle()
+
+    const after = (await page.evaluate(
+      `window.__starmap.getState().__camera.position.toArray()`,
+    )) as number[]
+
+    const delta = [after[0] - basis.p[0], after[1] - basis.p[1], after[2] - basis.p[2]]
+    const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    return { alongRight: dot(delta, basis.right), alongUp: dot(delta, basis.up) }
+  }
+
+  const orbitRight = await dragAndTrackCamera([500, 400], [800, 400])
+  check(
+    'orbit: dragging right carries the camera to its left',
+    orbitRight.alongRight < -1,
+    `camera moved ${orbitRight.alongRight.toFixed(1)} pc along its right axis`,
+  )
+
+  const orbitDown = await dragAndTrackCamera([640, 300], [640, 520])
+  check(
+    'orbit: dragging down carries the camera upward',
+    orbitDown.alongUp > 1,
+    `camera moved ${orbitDown.alongUp.toFixed(1)} pc along its up axis`,
+  )
+
+  await page.evaluate(`window.__starmap.getState().set('cameraMode', 'earth')`)
+  await page.waitForTimeout(2600)
+
+  const earthMarker = await markerNear()
+  const earthDrag = await dragAndTrack(earthMarker, [500, 400], [800, 400])
+  check(
+    'earth POV: the sky follows the mouse to the right',
+    earthDrag.dx > 0.02,
+    `fixed point moved ${earthDrag.dx > 0 ? 'right' : 'left'} (${earthDrag.dx.toFixed(3)} ndc)`,
+  )
+
+  await page.evaluate(`window.__starmap.getState().set('cameraMode', 'orbit')`)
+  await page.waitForTimeout(2000)
+
   check(
     'wheel dollies out',
     zoomedOut.distance > before.distance * 1.3,

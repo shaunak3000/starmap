@@ -55,12 +55,23 @@ export function Sidebar() {
               { value: 'fly', label: 'Fly', title: 'Free flight (WASD, Q/E, Shift)' },
             ]}
           />
+          <div className="button-row">
+            <button type="button" className="button ghost" onClick={() => state.orientView('top')}>
+              Top
+            </button>
+            <button type="button" className="button ghost" onClick={() => state.orientView('edge')}>
+              Edge-on
+            </button>
+            <button type="button" className="button ghost" onClick={() => state.resetView()}>
+              Reset
+            </button>
+          </div>
           <p className="hint">
             {state.cameraMode === 'earth'
               ? 'Drag to look around, scroll to zoom. This is the sky as we see it.'
               : state.cameraMode === 'fly'
-                ? 'WASD to move, Q/E for up and down, Shift to boost, scroll for speed.'
-                : 'Drag to orbit, scroll to dolly in and out.'}
+                ? 'WASD to move, Q/E up and down, Shift to boost, scroll for speed. Right-drag pans.'
+                : 'Drag to orbit, right- or shift-drag to pan, scroll to zoom toward the cursor.'}
           </p>
         </Section>
 

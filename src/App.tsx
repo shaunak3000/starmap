@@ -41,6 +41,14 @@ export default function App() {
     void init()
   }, [init])
 
+  useEffect(() => {
+    // The camera-input harness projects world points to check what the viewer
+    // actually sees move; that needs three's maths in the page.
+    if (import.meta.env.DEV) {
+      ;(window as unknown as { __three: typeof THREE }).__three = THREE
+    }
+  }, [])
+
   return (
     <>
       <Canvas

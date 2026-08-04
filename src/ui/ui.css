@@ -294,6 +294,18 @@
   background: rgba(124, 198, 255, 0.22);
 }
 
+.button-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.3rem;
+}
+
+.button-row .button {
+  padding: 0.35rem 0.2rem;
+  font-size: 0.72rem;
+}
+
 .button.ghost {
   border-color: var(--panel-border);
   background: var(--control-bg);

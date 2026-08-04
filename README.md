@@ -132,9 +132,20 @@ modes differ only in which inputs are live, switching between them is
 algebraically continuous. Dolly and travel interpolate in log space so one
 wheel notch covers the same *ratio* of distance at 0.1 pc as at 30 kpc, and the
 dolly is exactly reversible. Wheeling zooms toward the cursor rather than the
-orbit centre; right- or shift-drag pans. `npm run check:camera` drives real
-pointer and wheel events at the running app and asserts the camera responded,
-since screenshots cannot show whether navigation works.
+orbit centre; right- or shift-drag pans; Top / Edge-on / Reset jump to canonical
+angles relative to whichever reference frame is active.
+
+Rotation follows the universal convention that whatever you grab tracks your
+mouse. The arithmetic differs by mode — orbit swings the camera *around* a
+target, so moving it right pushes the scene left, while Earth POV pivots in
+place and pulls the scene right — which is exactly the kind of sign that is easy
+to get backwards in one mode and not notice.
+
+`npm run check:camera` drives real pointer and wheel events at the running app
+and asserts what the viewer sees move, since screenshots cannot show whether
+navigation works. Orbit is checked on the camera's own displacement rather than
+a marker: orbiting sweeps a point at target depth sideways whichever way you
+drag, so a marker test passes just as happily with the sign inverted.
 
 ## Caveats worth knowing
 
