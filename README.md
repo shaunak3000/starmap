@@ -1,5 +1,7 @@
 # starmap
 
+**[Live map →](https://shaunak3000.github.io/starmap/)**
+
 A 3D map of every catalogued star within 3,000 parsecs of the Sun, set inside a
 modelled Milky Way, built to make one thing obvious: **constellations are an
 accident of where we happen to stand.**
@@ -72,9 +74,20 @@ then writes binary tiers into `public/catalog/`. Both directories are
 gitignored and fully reproducible.
 
 ```bash
-npm test         # unit tests
-npm run build    # production bundle
+npm test             # unit tests
+npm run check:camera # drives real pointer/wheel input at a running dev server
+npm run build        # production bundle
 ```
+
+## Deploying
+
+Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
+
+The binary star tiers are generated rather than committed, so CI rebuilds them
+on each deploy: it caches the ~190 MB raw AT-HYG download keyed on
+`scripts/sources.ts`, packs the tiers, runs the tests, then builds with
+`BASE_PATH=/starmap/` so assets resolve under the project-site subpath. Nothing
+in `data/raw/` or `public/catalog/` is ever committed.
 
 ## How it is put together
 
