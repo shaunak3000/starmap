@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { FIELDS_PER_STAR, type CatalogTier, type Constellation } from './catalog-format.ts'
+import { FIELDS_PER_STAR, type Constellation, type DetailTier } from './catalog-format.ts'
 import { constellationSpread, constellationVantage } from './constellation-view.ts'
 
 /** Builds a tier whose stars sit at the given positions. */
-function tierOf(positions: [number, number, number][]): CatalogTier {
+function tierOf(positions: [number, number, number][]): DetailTier {
   const attributes = new Float32Array(positions.length * FIELDS_PER_STAR)
   positions.forEach(([x, y, z], i) => {
     const base = i * FIELDS_PER_STAR
@@ -13,11 +13,7 @@ function tierOf(positions: [number, number, number][]): CatalogTier {
     attributes[base + 3] = 5
     attributes[base + 4] = 0.6
   })
-  return {
-    attributes,
-    ids: new Uint32Array(positions.length),
-    count: positions.length,
-  }
+  return { kind: 'detail', attributes, count: positions.length }
 }
 
 function constellationOf(members: number[], nearestPc = 0, farthestPc = 0): Constellation {

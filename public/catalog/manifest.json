@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-08-04T03:21:26.750Z",
+  "maxDistancePc": 3000,
+  "sources": [
+    {
+      "name": "AT-HYG v4.0 (Astronomy Nexus)",
+      "url": "https://codeberg.org/astronexus/athyg",
+      "license": "CC BY-SA 4.0"
+    },
+    {
+      "name": "Stellarium modern sky culture (v25.3)",
+      "url": "https://github.com/Stellarium/stellarium",
+      "license": "GPL-2.0-or-later / CC BY-SA 4.0"
+    },
+    {
+      "name": "ESA Gaia DR3, via AT-HYG",
+      "url": "https://www.cosmos.esa.int/gaia",
+      "license": "CC BY-SA 3.0 IGO"
+    }
+  ],
+  "tiers": [
+    {
+      "name": "naked-eye + named",
+      "file": "t0.bin",
+      "count": 8292,
+      "magLimit": 6.5
+    },
+    {
+      "name": "to magnitude 9",
+      "file": "t1.bin",
+      "count": 111696,
+      "magLimit": 9
+    },
+    {
+      "name": "faint field",
+      "file": "t2.bin",
+      "count": 2378331,
+      "magLimit": null
+    }
+  ],
+  "constellationCount": 88
+}

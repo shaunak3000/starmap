@@ -28,22 +28,9 @@ jobs:
 
       - run: npm ci
 
-      # The binary star tiers are generated, not committed, so CI rebuilds them.
-      # The raw AT-HYG download is ~190 MB; caching it keeps repeat deploys to
-      # about a minute and keeps the load off Codeberg. Keyed on sources.ts,
-      # which holds the URLs and their expected byte sizes.
-      - name: Cache raw catalogue downloads
-        uses: actions/cache@v4
-        with:
-          path: data/raw
-          key: athyg-${{ hashFiles('scripts/sources.ts') }}
-
-      - name: Fetch catalogue sources
-        run: npm run data:fetch
-
-      - name: Pack binary star tiers
-        run: npm run data:build
-
+      # The packed star tiers are committed under public/catalog/, so this
+      # deploy touches no third-party host. Regenerating them is a deliberate
+      # local step (`npm run data`), not something a deploy can break on.
       - name: Unit tests
         run: npm test
 

@@ -199,27 +199,32 @@ export function createStarMaterial(options: StarMaterialOptions = {}): THREE.Sha
 }
 
 /**
- * Wraps a packed tier as a points geometry. The whole tier stays in one
- * interleaved buffer, so position/magnitude/colour cost a single GPU upload.
+ * Wraps a packed tier as a points geometry.
+ *
+ * The full-precision tier stays in one interleaved Float32 buffer. The bulk
+ * tiers arrive as planar half floats and become HALF_FLOAT attributes, which
+ * the GPU widens for free — the shader is identical either way.
  */
 export function createStarGeometry(tier: CatalogTier): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
-  const interleaved = new THREE.InterleavedBuffer(tier.attributes, FIELDS_PER_STAR)
 
-  geometry.setAttribute('position', new THREE.InterleavedBufferAttribute(interleaved, 3, 0))
-  geometry.setAttribute('aAbsMag', new THREE.InterleavedBufferAttribute(interleaved, 1, 3))
-  geometry.setAttribute('aColorIndex', new THREE.InterleavedBufferAttribute(interleaved, 1, 4))
+  if (tier.kind === 'detail') {
+    const interleaved = new THREE.InterleavedBuffer(tier.attributes, FIELDS_PER_STAR)
+    geometry.setAttribute('position', new THREE.InterleavedBufferAttribute(interleaved, 3, 0))
+    geometry.setAttribute('aAbsMag', new THREE.InterleavedBufferAttribute(interleaved, 1, 3))
+    geometry.setAttribute('aColorIndex', new THREE.InterleavedBufferAttribute(interleaved, 1, 4))
+  } else {
+    geometry.setAttribute('position', new THREE.Float16BufferAttribute(tier.positions, 3))
+    geometry.setAttribute('aAbsMag', new THREE.Float16BufferAttribute(tier.absMag, 1))
+    geometry.setAttribute('aColorIndex', new THREE.Float16BufferAttribute(tier.colorIndex, 1))
+  }
 
-  // Computing this from 1.8M points every frame is wasted work, and the cloud
-  // surrounds the camera anyway.
+  // The cloud always surrounds the camera, so an exact radius buys nothing;
+  // taking it from the position attribute avoids decoding half floats here.
+  const position = geometry.getAttribute('position')
   let maxRadius = 0
-  for (let i = 0; i < tier.count; i++) {
-    const base = i * FIELDS_PER_STAR
-    const r = Math.hypot(
-      tier.attributes[base],
-      tier.attributes[base + 1],
-      tier.attributes[base + 2],
-    )
+  for (let i = 0; i < position.count; i++) {
+    const r = Math.hypot(position.getX(i), position.getY(i), position.getZ(i))
     if (r > maxRadius) maxRadius = r
   }
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), maxRadius)

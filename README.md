@@ -81,13 +81,22 @@ npm run build        # production bundle
 
 ## Deploying
 
-Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
+Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`:
+test, build with `BASE_PATH=/starmap/` so assets resolve under the project-site
+subpath, publish.
 
-The binary star tiers are generated rather than committed, so CI rebuilds them
-on each deploy: it caches the ~190 MB raw AT-HYG download keyed on
-`scripts/sources.ts`, packs the tiers, runs the tests, then builds with
-`BASE_PATH=/starmap/` so assets resolve under the project-site subpath. Nothing
-in `data/raw/` or `public/catalog/` is ever committed.
+**The packed tiers in `public/catalog/` are committed**, so a deploy contacts no
+third-party host. They are generated files, which normally argues for building
+them in CI — but the upstream AT-HYG filename already changed once during this
+project (v3.3 → v4.0, and that repo keeps "only 1 major set of data files"), and
+a moving URL would silently break every future deploy. 25 MB in git buys
+immunity to that. Regenerating is a deliberate local step:
+
+```bash
+npm run data     # re-download, repack, then commit the result
+```
+
+Only `data/raw/` (the ~190 MB source download) stays gitignored.
 
 ## How it is put together
 
@@ -95,11 +104,24 @@ in `data/raw/` or `public/catalog/` is ever committed.
 with usable distances inside 1000 pc, and packs them into three tiers by
 magnitude so the app can show something immediately and stream the rest:
 
-| tier | stars | contents |
-| --- | --- | --- |
-| `t0.bin` | 8,292 | naked-eye and named, with metadata |
-| `t1.bin` | 111,696 | down to magnitude 9 |
-| `t2.bin` | 2,378,331 | the faint field, loaded on demand |
+| tier | stars | precision | size | contents |
+| --- | --- | --- | --- | --- |
+| `t0.bin` | 8,292 | float32 | 0.16 MB | naked-eye and named, with metadata |
+| `t1.bin` | 111,696 | float16 | 1.1 MB | down to magnitude 9 |
+| `t2.bin` | 2,378,331 | float16 | 22.7 MB | the faint field, loaded on demand |
+
+Only `t0` is read by the CPU — picking, constellation geometry, search and the
+star card all index into it, and it holds the stars you fly to and quote
+distances for, so it stays full precision. The bulk tiers are never touched
+outside the GPU, so they ship as half floats and upload as `HALF_FLOAT`
+attributes; the shader is identical either way.
+
+Half floats suit this data because their error is *relative*: Proxima lands
+within 0.0006 pc, a star at the 3 kpc edge within about 1.5 pc — well inside the
+parallax uncertainty out there. Fixed-point over the same range would put the
+error budget in exactly the wrong place. There is also no per-star id array:
+nothing read one, and for the faint field it was 9 MB of dead weight. Together
+those took the catalogue from 58 MB to 25 MB.
 
 Positions are recomputed from RA/Dec/distance rather than trusting the
 catalogue's own cartesian columns; the two agree to 1.3e-4 pc across all 2.5M

@@ -1,25 +1,45 @@
+import { encodeHalfArray } from './half-float.ts'
+
 /**
  * Binary layout for the packed star tiers.
  *
- * A tier is one self-describing little-endian file:
+ * Two shapes, because the tiers are used differently:
  *
- *   offset 0   char[4]     magic "SMAP"
- *   offset 4   uint32      format version
- *   offset 8   uint32      star count
- *   offset 12  uint32      floats per star (FIELDS_PER_STAR)
- *   offset 16  float32[]   count * FIELDS_PER_STAR interleaved attributes
- *   ...        uint32[]    count catalogue ids, parallel to the attribute block
+ *   detail (t0)  Float32, interleaved. Small, and the *only* tier the CPU ever
+ *                reads — picking, constellation geometry, the star card and
+ *                search all index into it, and it holds the stars you fly to
+ *                and quote distances for. Precision matters more than size.
  *
- * Interleaving the attributes lets the whole block become a single
- * InterleavedBuffer on the GPU with no per-attribute copies.
+ *   field (t1, t2)  Float16, planar. Never touched by the CPU; uploaded
+ *                straight to the GPU as HALF_FLOAT attributes. This is where
+ *                nearly all the bytes live, so halving them is what makes the
+ *                catalogue small enough to commit.
+ *
+ * Header (24 bytes, keeps both float32 and uint16 blocks aligned):
+ *
+ *   0   char[4]  magic "SMAP"
+ *   4   uint32   format version
+ *   8   uint32   star count
+ *   12  uint32   fields per star
+ *   16  uint32   element type (0 = float32, 1 = float16)
+ *   20  uint32   layout (0 = interleaved, 1 = planar)
+ *   24  ...      payload
+ *
+ * There is deliberately no per-star id array: nothing reads one at runtime, and
+ * for the faint field it was 9 MB of dead weight.
  */
 
 export const CATALOG_MAGIC = 'SMAP'
-export const CATALOG_VERSION = 1
+export const CATALOG_VERSION = 2
+export const HEADER_BYTES = 24
 
 /** x, y, z (parsecs, equatorial), absolute magnitude, B-V colour index. */
 export const FIELDS_PER_STAR = 5
-export const HEADER_BYTES = 16
+
+export const ELEMENT_FLOAT32 = 0
+export const ELEMENT_FLOAT16 = 1
+export const LAYOUT_INTERLEAVED = 0
+export const LAYOUT_PLANAR = 1
 
 export const FIELD_OFFSET = {
   x: 0,
@@ -29,34 +49,89 @@ export const FIELD_OFFSET = {
   colorIndex: 4,
 } as const
 
-export interface CatalogTier {
-  /** count * FIELDS_PER_STAR interleaved attributes. */
-  attributes: Float32Array
-  /** AT-HYG catalogue id per star. */
-  ids: Uint32Array
+/** Full-precision tier the CPU reads directly. */
+export interface DetailTier {
+  kind: 'detail'
   count: number
+  /** Interleaved x, y, z, absMag, colourIndex. */
+  attributes: Float32Array
 }
 
-export function encodeTier(attributes: Float32Array, ids: Uint32Array): ArrayBuffer {
-  const count = ids.length
-  if (attributes.length !== count * FIELDS_PER_STAR) {
-    throw new Error(
-      `attribute/id length mismatch: ${attributes.length} floats for ${count} stars`,
-    )
-  }
+/** Half-precision tier, GPU only. */
+export interface FieldTier {
+  kind: 'field'
+  count: number
+  /** Half-float bits, 3 per star. */
+  positions: Uint16Array
+  absMag: Uint16Array
+  colorIndex: Uint16Array
+}
 
-  const buffer = new ArrayBuffer(
-    HEADER_BYTES + attributes.byteLength + ids.byteLength,
-  )
+export type CatalogTier = DetailTier | FieldTier
+
+function writeHeader(
+  buffer: ArrayBuffer,
+  count: number,
+  elementType: number,
+  layout: number,
+): void {
   const view = new DataView(buffer)
-
   for (let i = 0; i < 4; i++) view.setUint8(i, CATALOG_MAGIC.charCodeAt(i))
   view.setUint32(4, CATALOG_VERSION, true)
   view.setUint32(8, count, true)
   view.setUint32(12, FIELDS_PER_STAR, true)
+  view.setUint32(16, elementType, true)
+  view.setUint32(20, layout, true)
+}
 
+/** Packs interleaved Float32 attributes verbatim. */
+export function encodeDetailTier(attributes: Float32Array): ArrayBuffer {
+  const count = attributes.length / FIELDS_PER_STAR
+  if (!Number.isInteger(count)) {
+    throw new Error(`attribute length ${attributes.length} is not a multiple of ${FIELDS_PER_STAR}`)
+  }
+
+  const buffer = new ArrayBuffer(HEADER_BYTES + attributes.byteLength)
+  writeHeader(buffer, count, ELEMENT_FLOAT32, LAYOUT_INTERLEAVED)
   new Float32Array(buffer, HEADER_BYTES, attributes.length).set(attributes)
-  new Uint32Array(buffer, HEADER_BYTES + attributes.byteLength, count).set(ids)
+  return buffer
+}
+
+/** Splits interleaved Float32 attributes into planar half-float blocks. */
+export function encodeFieldTier(attributes: Float32Array): ArrayBuffer {
+  const count = attributes.length / FIELDS_PER_STAR
+  if (!Number.isInteger(count)) {
+    throw new Error(`attribute length ${attributes.length} is not a multiple of ${FIELDS_PER_STAR}`)
+  }
+
+  const positions = new Float32Array(count * 3)
+  const absMag = new Float32Array(count)
+  const colorIndex = new Float32Array(count)
+
+  for (let i = 0; i < count; i++) {
+    const base = i * FIELDS_PER_STAR
+    positions[i * 3] = attributes[base]
+    positions[i * 3 + 1] = attributes[base + 1]
+    positions[i * 3 + 2] = attributes[base + 2]
+    absMag[i] = attributes[base + 3]
+    colorIndex[i] = attributes[base + 4]
+  }
+
+  const halfPositions = encodeHalfArray(positions)
+  const halfAbsMag = encodeHalfArray(absMag)
+  const halfColorIndex = encodeHalfArray(colorIndex)
+
+  const buffer = new ArrayBuffer(
+    HEADER_BYTES + halfPositions.byteLength + halfAbsMag.byteLength + halfColorIndex.byteLength,
+  )
+  writeHeader(buffer, count, ELEMENT_FLOAT16, LAYOUT_PLANAR)
+
+  let offset = HEADER_BYTES
+  new Uint16Array(buffer, offset, halfPositions.length).set(halfPositions)
+  offset += halfPositions.byteLength
+  new Uint16Array(buffer, offset, halfAbsMag.length).set(halfAbsMag)
+  offset += halfAbsMag.byteLength
+  new Uint16Array(buffer, offset, halfColorIndex.length).set(halfColorIndex)
 
   return buffer
 }
@@ -88,19 +163,38 @@ export function decodeTier(buffer: ArrayBuffer): CatalogTier {
     throw new Error(`catalog tier stride ${stride}, expected ${FIELDS_PER_STAR}`)
   }
 
-  const attributeFloats = count * FIELDS_PER_STAR
-  const expected = HEADER_BYTES + attributeFloats * 4 + count * 4
-  if (buffer.byteLength !== expected) {
-    throw new Error(
-      `catalog tier size mismatch: ${buffer.byteLength} bytes, expected ${expected}`,
-    )
+  const elementType = view.getUint32(16, true)
+
+  if (elementType === ELEMENT_FLOAT32) {
+    const floats = count * FIELDS_PER_STAR
+    const expected = HEADER_BYTES + floats * 4
+    if (buffer.byteLength !== expected) {
+      throw new Error(`catalog tier size mismatch: ${buffer.byteLength} bytes, expected ${expected}`)
+    }
+    return {
+      kind: 'detail',
+      count,
+      attributes: new Float32Array(buffer, HEADER_BYTES, floats),
+    }
   }
 
-  return {
-    attributes: new Float32Array(buffer, HEADER_BYTES, attributeFloats),
-    ids: new Uint32Array(buffer, HEADER_BYTES + attributeFloats * 4, count),
-    count,
+  if (elementType === ELEMENT_FLOAT16) {
+    const expected = HEADER_BYTES + count * 3 * 2 + count * 2 + count * 2
+    if (buffer.byteLength !== expected) {
+      throw new Error(`catalog tier size mismatch: ${buffer.byteLength} bytes, expected ${expected}`)
+    }
+
+    let offset = HEADER_BYTES
+    const positions = new Uint16Array(buffer, offset, count * 3)
+    offset += count * 3 * 2
+    const absMag = new Uint16Array(buffer, offset, count)
+    offset += count * 2
+    const colorIndex = new Uint16Array(buffer, offset, count)
+
+    return { kind: 'field', count, positions, absMag, colorIndex }
   }
+
+  throw new Error(`catalog tier has unknown element type ${elementType}`)
 }
 
 /** Per-star descriptive data, emitted only for the named/naked-eye tier. */

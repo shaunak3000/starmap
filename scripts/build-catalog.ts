@@ -22,11 +22,12 @@ import {
   type CatalogManifest,
   type Constellation,
   type StarMeta,
-  encodeTier,
+  encodeDetailTier,
+  encodeFieldTier,
 } from '../src/lib/catalog-format.ts'
 import { indexColumns, num, splitCsvRow, str } from './csv.ts'
 import { collectConstellationHips, parseStellariumSkyCulture } from './constellations.ts'
-import { GrowableFloat32, GrowableUint32 } from './growable.ts'
+import { GrowableFloat32 } from './growable.ts'
 import { ATTRIBUTION, OUT_DIR, RAW_DIR } from './sources.ts'
 
 /**
@@ -57,18 +58,24 @@ interface Tier {
   name: string
   file: string
   magLimit: number | null
+  /** Full precision for the tier the CPU reads; half for the GPU-only bulk. */
+  precision: 'detail' | 'field'
   attributes: GrowableFloat32
-  ids: GrowableUint32
   count: number
 }
 
-function makeTier(name: string, file: string, magLimit: number | null): Tier {
+function makeTier(
+  name: string,
+  file: string,
+  magLimit: number | null,
+  precision: 'detail' | 'field',
+): Tier {
   return {
     name,
     file,
     magLimit,
+    precision,
     attributes: new GrowableFloat32(1 << 16),
-    ids: new GrowableUint32(1 << 14),
     count: 0,
   }
 }
@@ -92,9 +99,9 @@ async function main() {
   )
 
   const tiers = [
-    makeTier('naked-eye + named', 't0.bin', T0_MAG_LIMIT),
-    makeTier('to magnitude 9', 't1.bin', T1_MAG_LIMIT),
-    makeTier('faint field', 't2.bin', null),
+    makeTier('naked-eye + named', 't0.bin', T0_MAG_LIMIT, 'detail'),
+    makeTier('to magnitude 9', 't1.bin', T1_MAG_LIMIT, 'field'),
+    makeTier('faint field', 't2.bin', null, 'field'),
   ]
 
   const meta: StarMeta[] = []
@@ -200,7 +207,6 @@ async function main() {
     const starIndex = tier.count
 
     tier.attributes.push(x, y, z, absMag, ci)
-    tier.ids.push(id)
     tier.count++
     stats.kept++
 
@@ -239,7 +245,9 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
   for (const tier of tiers) {
-    const buffer = encodeTier(tier.attributes.toTypedArray(), tier.ids.toTypedArray())
+    const attributes = tier.attributes.toTypedArray()
+    const buffer =
+      tier.precision === 'detail' ? encodeDetailTier(attributes) : encodeFieldTier(attributes)
     fs.writeFileSync(path.join(OUT_DIR, tier.file), Buffer.from(buffer))
   }
 

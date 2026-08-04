@@ -6,8 +6,9 @@ dist-ssr
 # Raw catalog downloads — large, reproducible via `npm run data:fetch`
 data/raw/
 
-# Generated binary catalog tiers — reproducible via `npm run data:build`
-public/catalog/
+# NOTE: public/catalog/ IS committed. It is generated, but committing it makes
+# deploys hermetic — the upstream AT-HYG filename already changed once (v3.3 to
+# v4.0) mid-project, which would silently break every future deploy.
 
 .DS_Store
 .vscode/*

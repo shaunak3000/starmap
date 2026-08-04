@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import { FIELDS_PER_STAR, type CatalogTier, type Constellation } from '../lib/catalog-format.ts'
+import { FIELDS_PER_STAR, type Constellation, type DetailTier } from '../lib/catalog-format.ts'
 import { useStarmap } from '../state/store.ts'
 import { CELESTIAL_SPHERE_RADIUS_PC } from './StarField.tsx'
 
@@ -50,7 +50,7 @@ function createLineMaterial(color: string, opacity: number): THREE.ShaderMateria
 }
 
 /** Expands polylines into gl_LINES pairs, reading true positions from tier 0. */
-function buildSegments(constellations: Constellation[], t0: CatalogTier): THREE.BufferGeometry {
+function buildSegments(constellations: Constellation[], t0: DetailTier): THREE.BufferGeometry {
   const positions: number[] = []
 
   const pushStar = (index: number) => {

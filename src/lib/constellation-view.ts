@@ -1,4 +1,4 @@
-import { FIELDS_PER_STAR, type CatalogTier, type Constellation } from './catalog-format.ts'
+import { FIELDS_PER_STAR, type Constellation, type DetailTier } from './catalog-format.ts'
 import type { Vec3 } from './astro.ts'
 
 export interface Vantage {
@@ -12,7 +12,7 @@ export interface Vantage {
   spanPc: number
 }
 
-function memberPositions(constellation: Constellation, t0: CatalogTier): Vec3[] {
+function memberPositions(constellation: Constellation, t0: DetailTier): Vec3[] {
   return constellation.members.map((index) => {
     const base = index * FIELDS_PER_STAR
     return [t0.attributes[base], t0.attributes[base + 1], t0.attributes[base + 2]] as Vec3
@@ -43,7 +43,7 @@ function cross(a: Vec3, b: Vec3): Vec3 {
  */
 export function constellationVantage(
   constellation: Constellation,
-  t0: CatalogTier,
+  t0: DetailTier,
 ): Vantage {
   const positions = memberPositions(constellation, t0)
   if (positions.length === 0) {
