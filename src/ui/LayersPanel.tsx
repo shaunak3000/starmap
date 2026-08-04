@@ -58,7 +58,7 @@ export function LayersPanel() {
             label={
               state.fieldLoading
                 ? 'Faint field (loading…)'
-                : `Faint field${state.fieldTier ? '' : ' (+54 MB)'}`
+                : `Faint field${state.fieldTier ? '' : ' (+21 MB)'}`
             }
             checked={state.showFaintField}
             disabled={state.fieldLoading}
