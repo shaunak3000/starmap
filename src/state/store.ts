@@ -210,7 +210,12 @@ export const useStarmap = create<StarmapState>((set, get) => ({
     })),
 
   startTour: () => set({ tourStep: 0 }),
-  stopTour: () => set({ tourStep: null }),
+
+  // The opening beat hides the figures to show bare sky. Stopping there would
+  // otherwise strand the viewer with constellations off and no hint why, so the
+  // tour always hands back the layer it borrowed.
+  stopTour: () => set({ tourStep: null, showConstellations: true }),
+
   setTourStep: (step) => set({ tourStep: step }),
 
   viewGalaxy: () =>

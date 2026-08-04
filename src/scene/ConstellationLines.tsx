@@ -32,6 +32,17 @@ const FRAGMENT_SHADER = /* glsl */ `
   }
 `
 
+/**
+ * Figure lines are additive on black, so opacity is doing the work colour
+ * normally would: at 0.18 a #4d7fb8 line resolves to about rgb(14,23,33), which
+ * is nearly invisible. These are tuned to read clearly against a dense star
+ * field without competing with the stars themselves.
+ */
+const BASE_COLOUR = '#6ba3dd'
+const BASE_OPACITY = 0.5
+/** Dimmed, not hidden, while one figure is highlighted, so context survives. */
+const BASE_OPACITY_WHEN_ACTIVE = 0.18
+
 function createLineMaterial(color: string, opacity: number): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader: VERTEX_SHADER,
@@ -92,10 +103,8 @@ export function ConstellationLines() {
     return buildSegments([constellation], catalog.t0)
   }, [catalog, active])
 
-  // All 88 figures at once is a lot of line; they read as texture rather than
-  // clutter only when kept well under the stars in brightness.
-  const baseMaterial = useMemo(() => createLineMaterial('#4d7fb8', 0.18), [])
-  const activeMaterial = useMemo(() => createLineMaterial('#8fd0ff', 0.95), [])
+  const baseMaterial = useMemo(() => createLineMaterial(BASE_COLOUR, BASE_OPACITY), [])
+  const activeMaterial = useMemo(() => createLineMaterial('#a8e0ff', 1), [])
 
   useEffect(() => () => baseMaterial.dispose(), [baseMaterial])
   useEffect(() => () => activeMaterial.dispose(), [activeMaterial])
@@ -109,7 +118,7 @@ export function ConstellationLines() {
     }
     // Selecting one figure pushes the rest back rather than hiding them, so the
     // chosen constellation reads against its context.
-    baseMaterial.uniforms.uOpacity.value = active ? 0.07 : 0.18
+    baseMaterial.uniforms.uOpacity.value = active ? BASE_OPACITY_WHEN_ACTIVE : BASE_OPACITY
   }, [baseMaterial, activeMaterial, dissolve, active, sphereRadiusPc])
 
   if (!show || !all) return null
