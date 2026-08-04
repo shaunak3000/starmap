@@ -46,22 +46,32 @@ async function main() {
   for (const at of CAPTURE_AT) {
     await page.waitForTimeout(Math.max(0, at * 1000 - (Date.now() - started)))
 
+    // The store handle is dev-only, so against a production build fall back to
+    // what the page is actually showing. That is the more honest check anyway.
     const state = (await page.evaluate(
-      `(() => { const s = window.__starmap.getState()
-        return { step: s.tourStep, mode: s.cameraMode, dist: s.cameraDistancePc,
-                 active: s.activeConstellation, galaxy: s.showGalaxy, isolate: s.isolate,
-                 caption: document.querySelector('.tour-caption')?.textContent ?? null } })()`,
+      `(() => {
+        const caption = document.querySelector('.tour-caption')?.textContent ?? null
+        const hud = document.querySelector('.hud')?.textContent ?? null
+        const s = window.__starmap ? window.__starmap.getState() : null
+        return s
+          ? { caption, hud, step: s.tourStep, mode: s.cameraMode,
+              dist: Math.round(s.cameraDistancePc), galaxy: s.showGalaxy,
+              isolate: s.isolate, dissolve: s.dissolve }
+          : { caption, hud }
+      })()`,
     )) as Record<string, unknown>
 
     const file = path.join(SHOT_DIR, `tour-t${String(at).padStart(2, '0')}s.png`)
     await page.screenshot({ path: file })
 
-    console.log(
-      `t+${String(at).padStart(2)}s  step=${state.step ?? '-'}  mode=${state.mode}  ` +
-        `${Math.round(Number(state.dist))} pc  active=${state.active ?? '-'}  ` +
-        `galaxy=${state.galaxy}  isolate=${state.isolate}`,
-    )
-    if (state.caption) console.log(`        "${state.caption}"`)
+    const detail =
+      state.step === undefined
+        ? `  ${state.hud ?? ''}`
+        : `  step=${state.step ?? '-'}  mode=${state.mode}  ${state.dist} pc  ` +
+          `galaxy=${state.galaxy}  isolate=${state.isolate}  dissolve=${state.dissolve}`
+
+    console.log(`t+${String(at).padStart(2)}s${detail}`)
+    console.log(`        "${state.caption ?? '(no caption)'}"`)
 
     previous = at
   }
