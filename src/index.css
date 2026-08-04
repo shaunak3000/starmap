@@ -26,6 +26,13 @@ body,
   color: var(--fg);
 }
 
+/* The canvas sizes to its parent, so every wrapper between it and #root has to
+   carry the full height or it collapses to nothing. */
+.app-root {
+  width: 100%;
+  height: 100%;
+}
+
 canvas {
   display: block;
   touch-action: none;

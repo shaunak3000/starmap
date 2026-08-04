@@ -42,6 +42,9 @@ export interface FocusRequest {
 /** Canonical viewing angles, relative to whichever frame is active. */
 export type ViewPreset = 'top' | 'edge'
 
+/** Shell radius used when no figure is driving it. */
+export const DEFAULT_SPHERE_RADIUS_PC = 120
+
 interface StarmapState {
   catalog: LoadedCatalog | null
   loading: boolean
@@ -88,6 +91,8 @@ interface StarmapState {
   sphereRadiusPc: number
 
   focusRequest: FocusRequest | null
+  /** Index of the running tour step, or null when no tour is playing. */
+  tourStep: number | null
   /** Metres-per-second equivalent for fly mode, in parsecs per second. */
   flySpeed: number
   /** Live camera distance from the Sun, mirrored out of the rig for the HUD. */
@@ -113,6 +118,9 @@ interface StarmapState {
   orientView: (preset: ViewPreset) => void
   /** Back to the opening view: standing on the Sun, looking out. */
   resetView: () => void
+  startTour: () => void
+  stopTour: () => void
+  setTourStep: (step: number) => void
 }
 
 export const useStarmap = create<StarmapState>((set, get) => ({
@@ -146,9 +154,10 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   // Truth is the default; collapsing to the celestial sphere is the deliberate
   // act that shows what the constellations assume.
   dissolve: 1,
-  sphereRadiusPc: 120,
+  sphereRadiusPc: DEFAULT_SPHERE_RADIUS_PC,
 
   focusRequest: null,
+  tourStep: null,
   flySpeed: 5,
   cameraDistancePc: 60,
   fps: 0,
@@ -192,9 +201,17 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   setActiveConstellation: (id) =>
     set((state) => ({
       activeConstellation: id,
-      // Leaving a constellation snaps the figure back together.
-      dissolve: id === null ? 0 : state.dissolve,
+      // Leaving a figure restores true distances. This said `0` until now,
+      // which is the collapsed celestial sphere — the opposite of truth. It
+      // dated from when dissolve defaulted to 0, and meant that clearing a
+      // selection silently flattened the whole sky onto a shell.
+      dissolve: id === null ? 1 : state.dissolve,
+      sphereRadiusPc: id === null ? DEFAULT_SPHERE_RADIUS_PC : state.sphereRadiusPc,
     })),
+
+  startTour: () => set({ tourStep: 0 }),
+  stopTour: () => set({ tourStep: null }),
+  setTourStep: (step) => set({ tourStep: step }),
 
   viewGalaxy: () =>
     set((state) => ({

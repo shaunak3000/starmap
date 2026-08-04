@@ -20,5 +20,7 @@
 
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts", "src/lib/**/*.test.ts"]
+  "include": ["vite.config.ts", "scripts/**/*.ts"],
+  // Tests live in tsconfig.test.json, which has the DOM types they need.
+  "exclude": ["scripts/**/*.test.ts"]
 }

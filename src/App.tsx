@@ -7,6 +7,7 @@ import { Hud } from './ui/Hud.tsx'
 import { LayersPanel } from './ui/LayersPanel.tsx'
 import { SearchBox } from './ui/SearchBox.tsx'
 import { StarCard } from './ui/StarCard.tsx'
+import { Tour } from './ui/Tour.tsx'
 import { ViewPanel } from './ui/ViewPanel.tsx'
 
 function LoadState() {
@@ -37,6 +38,7 @@ function LoadState() {
 export default function App() {
   const init = useStarmap((state) => state.init)
   const ready = useStarmap((state) => state.catalog !== null)
+  const touring = useStarmap((state) => state.tourStep !== null)
 
   useEffect(() => {
     void init()
@@ -51,7 +53,7 @@ export default function App() {
   }, [])
 
   return (
-    <>
+    <div className={`app-root${touring ? ' tour-playing' : ''}`}>
       <Canvas
         camera={{ fov: 60, near: 0.01, far: 120000, position: [0, 0, 60] }}
         gl={{
@@ -78,8 +80,9 @@ export default function App() {
           <SearchBox />
           <StarCard />
           <Hud />
+          <Tour />
         </>
       )}
-    </>
+    </div>
   )
 }

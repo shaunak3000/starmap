@@ -543,6 +543,105 @@
   text-transform: none;
 }
 
+/* ---------------------------------------------------------------------- tour */
+
+.tour {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 2.2rem;
+  width: min(30rem, calc(100vw - 36rem));
+  padding: 0.9rem 1.1rem 0.8rem;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: center;
+  animation: tour-in 420ms ease-out;
+}
+
+@keyframes tour-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tour-progress {
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-bottom: 0.15rem;
+}
+
+.tour-dot {
+  width: 1.1rem;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background 300ms ease;
+}
+
+.tour-dot.is-done {
+  background: rgba(124, 198, 255, 0.4);
+}
+
+.tour-dot.is-current {
+  background: var(--accent);
+}
+
+.tour-caption {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: #eaf3ff;
+}
+
+.tour-detail {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--fg-dim);
+}
+
+.tour-skip {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(139, 149, 171, 0.8);
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  padding: 0.3rem 0 0;
+  cursor: pointer;
+}
+
+.tour-skip:hover {
+  color: var(--fg);
+}
+
+/* The panels are noise during the tour; they fade back in when it ends. */
+.tour-playing .panel-left,
+.tour-playing .panel-right,
+.tour-playing .search,
+.tour-playing .star-card {
+  opacity: 0.12;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+.panel-left,
+.panel-right,
+.search,
+.star-card {
+  transition: opacity 500ms ease;
+}
+
 /* ---------------------------------------------------------------------- hud */
 
 .hud {

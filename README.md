@@ -12,6 +12,13 @@ years away, with no relationship to each other beyond sharing a line of sight.
 
 ![Orion, revealed side-on, with its members at true distances](docs/images/reveal.png)
 
+First-time visitors get a **60-second guided tour** — the Earth sky, Orion's
+figure, the same stars seen side-on as the hunter falls apart, then out to the
+Galaxy. It autoplays once (never against `prefers-reduced-motion`), stops the
+instant you touch anything, and hands over the exact view it was mid-shot on,
+because its steps write to the same store the controls do. "Take the tour"
+replays it.
+
 ## What it does
 
 - **2.5M stars** from AT-HYG v4 (Gaia DR3 astrometry, with Hipparcos filling the

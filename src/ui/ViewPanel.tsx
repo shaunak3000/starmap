@@ -56,7 +56,10 @@ export function ViewPanel() {
         </Section>
 
         <Section title="Scale">
-          <button type="button" className="button" onClick={() => state.viewGalaxy()}>
+          <button type="button" className="button" onClick={() => state.startTour()}>
+            Take the tour
+          </button>
+          <button type="button" className="button ghost" onClick={() => state.viewGalaxy()}>
             View the whole Galaxy
           </button>
           <p className="hint">
