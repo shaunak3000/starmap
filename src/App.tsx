@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { Scene } from './scene/Scene.tsx'
 import { useStarmap } from './state/store.ts'
 import { Hud } from './ui/Hud.tsx'
+import { LabelLayer } from './ui/LabelLayer.tsx'
 import { LayersPanel } from './ui/LayersPanel.tsx'
 import { SearchBox } from './ui/SearchBox.tsx'
 import { StarCard } from './ui/StarCard.tsx'
@@ -80,6 +81,7 @@ export default function App() {
           <SearchBox />
           <StarCard />
           <Hud />
+          <LabelLayer />
           <Tour />
         </>
       )}

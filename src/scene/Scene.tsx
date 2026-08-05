@@ -6,6 +6,7 @@ import { CameraRig } from './CameraRig.tsx'
 import { ConstellationLines } from './ConstellationLines.tsx'
 import { ConstellationMembers } from './ConstellationMembers.tsx'
 import { FrameMeter } from './FrameMeter.tsx'
+import { LabelPlacer } from './LabelPlacer.tsx'
 import { Galaxy } from './Galaxy.tsx'
 import { Picking } from './Picking.tsx'
 import { SelectionMarker } from './SelectionMarker.tsx'
@@ -35,6 +36,7 @@ export function Scene() {
       <CameraRig />
       <Picking />
       <FrameMeter />
+      <LabelPlacer />
 
       <group matrixAutoUpdate={false} matrix={matrix}>
         {catalog && <StarField tier={catalog.t0} visible={!isolating} />}

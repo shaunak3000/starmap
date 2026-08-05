@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from 'react'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { LY_PER_PC } from '../lib/astro.ts'
 import { FIELDS_PER_STAR } from '../lib/catalog-format.ts'
 import { starLabel } from '../lib/catalog-loader.ts'
 import { useStarmap } from '../state/store.ts'
 import { CELESTIAL_SPHERE_RADIUS_PC } from './StarField.tsx'
+import type { LabelCandidate } from './labels.ts'
 
 /** Ring markers so a figure's vertices stay findable at any range. */
 const VERTEX_SHADER = /* glsl */ `
@@ -46,7 +46,6 @@ export function ConstellationMembers() {
   const active = useStarmap((state) => state.activeConstellation)
   const dissolve = useStarmap((state) => state.dissolve)
   const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
-  const showLabels = useStarmap((state) => state.showLabels)
   const unit = useStarmap((state) => state.unit)
   const show = useStarmap((state) => state.showConstellations)
 
@@ -115,66 +114,52 @@ export function ConstellationMembers() {
   useEffect(() => () => geometry?.dispose(), [geometry])
 
   /**
-   * Labelling every member turns the near end of a figure into a pile of
-   * overlapping text. Named stars are the ones people recognise, and the
-   * nearest and farthest members are the ones carrying the argument.
+   * Label candidates, ranked so the collision pass drops the least useful.
+   *
+   * The nearest and farthest members carry the whole argument about depth, so
+   * they outrank everything. Proper names come next, brightest first, since
+   * those are the stars anyone recognises. Bayer designations fill any space
+   * left over.
    */
-  const labelled = useMemo(() => {
+  const candidates = useMemo<LabelCandidate[]>(() => {
     if (members.length === 0) return []
 
     const byDistance = [...members].sort((a, b) => a.distancePc - b.distancePc)
-    const keep = new Set<number>([
-      byDistance[0].index,
-      byDistance[byDistance.length - 1].index,
-    ])
-    for (const member of members) {
-      if (member.meta?.proper) keep.add(member.index)
+    const nearest = byDistance[0].index
+    const farthest = byDistance[byDistance.length - 1].index
+
+    const priorityOf = (member: (typeof members)[number]) => {
+      if (member.index === nearest || member.index === farthest) return 0
+      if (member.meta?.proper) return 1 + (member.meta.mag ?? 10) / 100
+      if (member.meta?.bayer) return 3 + (member.meta.mag ?? 10) / 100
+      return 10
     }
 
-    return members.filter((member) => keep.has(member.index))
-  }, [members])
-
-  /** Where each label sits once the collapse is applied. */
-  const labelPositions = useMemo(
-    () =>
-      labelled.map((member) =>
-        member.position
+    return members
+      .filter((member) => priorityOf(member) < 10)
+      .map((member) => ({
+        key: member.index,
+        // Follows the collapse, so a label never floats away from its star.
+        position: member.position
           .clone()
           .normalize()
           .multiplyScalar(sphereRadiusPc)
           .lerp(member.position, dissolve),
-      ),
-    [labelled, dissolve, sphereRadiusPc],
-  )
+        name: starLabel(member.meta),
+        detail:
+          unit === 'pc'
+            ? `${member.distancePc.toFixed(0)} pc`
+            : `${(member.distancePc * LY_PER_PC).toFixed(0)} ly`,
+        priority: priorityOf(member),
+      }))
+  }, [members, dissolve, sphereRadiusPc, unit])
+
+  // Published rather than rendered here: the DOM lives outside the Canvas.
+  useEffect(() => {
+    useStarmap.setState({ labelCandidates: show ? candidates : [] })
+  }, [candidates, show])
 
   if (!show || !constellation || !geometry) return null
 
-  return (
-    <>
-      <points geometry={geometry} material={material} frustumCulled={false} />
-
-      {/* Labels quote true distances, so they would be lying about a star drawn
-          on the shell. They fade out with the collapse. */}
-      {showLabels &&
-        dissolve > 0.6 &&
-        labelled.map((member, i) => (
-          <Html
-            key={member.index}
-            position={labelPositions[i]}
-            center
-            zIndexRange={[20, 0]}
-            style={{ pointerEvents: 'none' }}
-          >
-            <div className="star-tag">
-              <span className="star-tag-name">{starLabel(member.meta)}</span>
-              <span className="star-tag-distance">
-                {unit === 'pc'
-                  ? `${member.distancePc.toFixed(0)} pc`
-                  : `${(member.distancePc * LY_PER_PC).toFixed(0)} ly`}
-              </span>
-            </div>
-          </Html>
-        ))}
-    </>
-  )
+  return <points geometry={geometry} material={material} frustumCulled={false} />
 }

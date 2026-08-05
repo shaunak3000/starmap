@@ -63,13 +63,29 @@ canvas {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/*
+ * Full-viewport layer that LabelPlacer writes into. Labels start hidden and are
+ * revealed one at a time as the collision pass finds room for them, so a label
+ * is only ever on screen because it earned the space.
+ */
+.label-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  /* Above the canvas, below the panels. */
+  z-index: 20;
+}
+
 .star-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.05rem;
   white-space: nowrap;
-  transform: translateY(-1.6rem);
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.95);
   user-select: none;
 }

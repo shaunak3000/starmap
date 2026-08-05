@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { CatalogTier } from '../lib/catalog-format.ts'
+import type { LabelCandidate } from '../scene/labels.ts'
 import {
   DEFAULT_CULTURE,
   type LoadedCatalog,
@@ -82,6 +83,8 @@ interface StarmapState {
   isolate: boolean
   /** Current grid cell size in parsecs, published by AxisGrid. */
   gridStepPc: number
+  /** Star labels awaiting placement, published by the active figure. */
+  labelCandidates: LabelCandidate[]
 
   selection: Selection | null
   hovered: number | null
@@ -160,6 +163,7 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   showGalaxy: false,
   isolate: false,
   gridStepPc: 10,
+  labelCandidates: [],
 
   selection: null,
   hovered: null,
