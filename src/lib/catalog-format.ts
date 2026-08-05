@@ -1,4 +1,5 @@
 import { encodeHalfArray } from './half-float.ts'
+import type { Visibility } from './visibility.ts'
 
 /**
  * Binary layout for the packed star tiers.
@@ -221,12 +222,19 @@ export interface ConstellationLine {
 }
 
 export interface Constellation {
-  /** Three-letter IAU abbreviation, e.g. "Ori". */
+  /** Stable key within its culture. An IAU code only in the modern set. */
   id: string
-  /** Latin name, e.g. "Orion". */
-  latin: string
-  /** English name, e.g. "Hunter". */
-  english: string
+  /**
+   * Display name — the culture's own name where it has one. Called `name`
+   * rather than `latin` because a nakshatra has no Latin name and never did.
+   */
+  name: string
+  /** English translation, where the culture supplies one. */
+  english?: string
+  /** Name in its own script, e.g. 毕宿 or अश्विनी. */
+  native?: string
+  /** Romanised pronunciation, e.g. "Bi Xiu", "Aśvinī". */
+  pronounce?: string
   lines: ConstellationLine[]
   /** Unique member star indices into T0. */
   members: number[]
@@ -235,6 +243,19 @@ export interface Constellation {
   /** Distance spread across members, in parsecs. */
   nearestPc: number
   farthestPc: number
+  /** When and from where this figure can be seen. */
+  visibility: Visibility
+}
+
+/** A sky culture as shipped: one way of carving up the same stars. */
+export interface SkyCulture {
+  id: string
+  label: string
+  note: string
+  file: string
+  constellationCount: number
+  /** Defines a lunar mansion system (nakshatras, xiu, manazil). */
+  lunarSystem: boolean
 }
 
 export interface CatalogManifest {
@@ -242,5 +263,6 @@ export interface CatalogManifest {
   maxDistancePc: number
   sources: { name: string; url: string; license: string }[]
   tiers: { name: string; file: string; count: number; magLimit: number | null }[]
-  constellationCount: number
+  /** Every sky culture shipped alongside the star tiers. */
+  cultures: SkyCulture[]
 }

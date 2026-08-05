@@ -56,7 +56,7 @@ export const TOUR: TourStep[] = [
     id: 'sky',
     caption: 'The night sky, from Earth.',
     detail: 'Every star you can see, in the direction you would see it.',
-    holdMs: 6000,
+    holdMs: 4500,
     apply: (store) => {
       resetLayers(store)
       store.set('showConstellations', false)
@@ -69,7 +69,7 @@ export const TOUR: TourStep[] = [
     id: 'figure',
     caption: 'People drew a hunter here.',
     detail: 'Orion. Betelgeuse at the shoulder, Rigel at the foot, three stars for a belt.',
-    holdMs: 7000,
+    holdMs: 5000,
     apply: (store) => {
       store.set('showConstellations', true)
       store.setActiveConstellation('Ori')
@@ -79,7 +79,7 @@ export const TOUR: TourStep[] = [
     id: 'reveal',
     caption: 'Step sideways, and the hunter falls apart.',
     detail: 'The same stars, seen from a few hundred light years off Earth’s line of sight.',
-    holdMs: 11000,
+    holdMs: 7500,
     apply: (store) => {
       store.revealConstellation('Ori')
     },
@@ -98,7 +98,7 @@ export const TOUR: TourStep[] = [
         ? `Its nearest star is ${s.nearest.toLocaleString()} light years away; its farthest is ${s.farthest.toLocaleString()}. They share a line of sight, and nothing else.`
         : 'They share a line of sight, and nothing else.'
     },
-    holdMs: 9000,
+    holdMs: 6500,
     apply: (store) => {
       store.set('showLabels', true)
       store.set('isolate', true)
@@ -109,7 +109,7 @@ export const TOUR: TourStep[] = [
     caption: 'Everything we have measured is this bubble.',
     detail:
       'Real stars reach 3,000 parsecs. The Sun sits 8,150 parsecs out on the Local Arm — the disk and arms beyond our bubble are a model, not data.',
-    holdMs: 12000,
+    holdMs: 8500,
     apply: (store) => {
       store.set('isolate', false)
       store.setActiveConstellation(null)
@@ -120,7 +120,7 @@ export const TOUR: TourStep[] = [
     id: 'end',
     caption: 'Constellations are an accident of where we stand.',
     detail: 'Now go and look for yourself.',
-    holdMs: 7000,
+    holdMs: 5000,
     apply: (store) => {
       store.set('showGalaxy', false)
       store.set('showConstellations', true)

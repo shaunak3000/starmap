@@ -348,6 +348,56 @@
   color: var(--fg);
 }
 
+.culture-select {
+  width: 100%;
+  background: var(--control-bg);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.4rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.culture-select:focus {
+  border-color: rgba(124, 198, 255, 0.4);
+}
+
+.culture-note {
+  margin: 0;
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.culture-list-title {
+  margin-top: 0.35rem;
+}
+
+/* Native script sits above its romanisation, so a name in a script the viewer
+   cannot read still says something. */
+.constellation-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.constellation-pronounce {
+  font-size: 0.62rem;
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.constellation-hemi {
+  margin-left: 0.25rem;
+  padding: 0 0.2rem;
+  border-radius: 3px;
+  background: rgba(124, 198, 255, 0.16);
+  color: var(--accent);
+}
+
 /* ------------------------------------------------------------------- search */
 
 .search {

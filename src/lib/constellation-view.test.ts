@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FIELDS_PER_STAR, type Constellation, type DetailTier } from './catalog-format.ts'
 import { constellationSpread, constellationVantage } from './constellation-view.ts'
+import { visibilityFor } from './visibility.ts'
 
 /** Builds a tier whose stars sit at the given positions. */
 function tierOf(positions: [number, number, number][]): DetailTier {
@@ -19,13 +20,14 @@ function tierOf(positions: [number, number, number][]): DetailTier {
 function constellationOf(members: number[], nearestPc = 0, farthestPc = 0): Constellation {
   return {
     id: 'Tst',
-    latin: 'Testus',
+    name: 'Testus',
     english: 'Test',
     lines: [{ path: members }],
     members,
     missingHip: [],
     nearestPc,
     farthestPc,
+    visibility: visibilityFor([]),
   }
 }
 

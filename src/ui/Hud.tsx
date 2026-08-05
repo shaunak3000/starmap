@@ -1,5 +1,6 @@
 import { formatDistance as format } from './format.ts'
 import { constellationSpread } from '../lib/constellation-view.ts'
+import { describeVisibility } from '../lib/visibility.ts'
 import { useStarmap } from '../state/store.ts'
 
 export function Hud() {
@@ -12,6 +13,7 @@ export function Hud() {
   const fps = useStarmap((state) => state.fps)
   const showGrid = useStarmap((state) => state.showGrid)
   const gridStepPc = useStarmap((state) => state.gridStepPc)
+  const viewerNorth = useStarmap((state) => state.viewerNorth)
 
   if (!catalog) return null
 
@@ -43,14 +45,19 @@ export function Hud() {
         )}
       </div>
       {active && (
-        <div>
-          {active.latin}: <span className="hud-figure">{format(active.nearestPc, unit)}</span> to{' '}
-          <span className="hud-figure">{format(active.farthestPc, unit)}</span> —{' '}
-          <span className="hud-figure">
-            {constellationSpread(active).ratio.toFixed(0)}x
-          </span>{' '}
-          deep
-        </div>
+        <>
+          <div>
+            {active.name}
+            {active.english && active.english !== active.name && ` (${active.english})`}:{' '}
+            <span className="hud-figure">{format(active.nearestPc, unit)}</span> to{' '}
+            <span className="hud-figure">{format(active.farthestPc, unit)}</span> —{' '}
+            <span className="hud-figure">
+              {constellationSpread(active).ratio.toFixed(0)}x
+            </span>{' '}
+            deep
+          </div>
+          <div>{describeVisibility(active.visibility, viewerNorth)}</div>
+        </>
       )}
     </div>
   )

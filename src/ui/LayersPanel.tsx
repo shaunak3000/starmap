@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useStarmap } from '../state/store.ts'
 import { Section, Toggle } from './controls.tsx'
+import { describeVisibility } from '../lib/visibility.ts'
 import { formatDistance } from './format.ts'
+
+/** Compact month labels for the figure list. */
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 /**
  * Right panel: what is drawn, and which figure is being examined. The figure
@@ -15,15 +19,19 @@ export function LayersPanel() {
   const constellations = useMemo(() => {
     if (!state.catalog) return []
     const needle = filter.trim().toLowerCase()
-    const all = [...state.catalog.constellations].sort((a, b) => a.latin.localeCompare(b.latin))
+    const all = [...state.catalog.constellations].sort((a, b) => a.name.localeCompare(b.name))
     if (!needle) return all
     return all.filter(
       (c) =>
-        c.latin.toLowerCase().includes(needle) ||
-        c.english.toLowerCase().includes(needle) ||
+        c.name.toLowerCase().includes(needle) ||
+        (c.english?.toLowerCase().includes(needle) ?? false) ||
+        (c.pronounce?.toLowerCase().includes(needle) ?? false) ||
         c.id.toLowerCase().includes(needle),
     )
   }, [state.catalog, filter])
+
+  const cultures = state.catalog?.manifest.cultures ?? []
+  const activeCulture = cultures.find((c) => c.id === state.skyCulture)
 
   return (
     <aside className="panel-right panel">
@@ -71,7 +79,24 @@ export function LayersPanel() {
       </div>
 
       <div className="panel-flex">
-        <p className="section-title">Constellations ({constellations.length})</p>
+        <p className="section-title">Sky culture</p>
+        <select
+          className="culture-select"
+          value={state.skyCulture}
+          disabled={state.cultureLoading}
+          onChange={(event) => void state.setSkyCulture(event.target.value)}
+        >
+          {cultures.map((culture) => (
+            <option key={culture.id} value={culture.id}>
+              {culture.label} · {culture.constellationCount}
+            </option>
+          ))}
+        </select>
+        {activeCulture && <p className="hint culture-note">{activeCulture.note}</p>}
+
+        <p className="section-title culture-list-title">
+          Figures ({constellations.length})
+        </p>
         <input
           className="constellation-search"
           placeholder="Filter figures…"
@@ -86,12 +111,28 @@ export function LayersPanel() {
               className="constellation-row"
               aria-pressed={state.activeConstellation === constellation.id}
               onClick={() => state.revealConstellation(constellation.id)}
-              title={`${constellation.english} — nearest ${formatDistance(constellation.nearestPc, state.unit)}, farthest ${formatDistance(constellation.farthestPc, state.unit)}`}
+              title={[
+                constellation.english,
+                constellation.pronounce,
+                describeVisibility(constellation.visibility, state.viewerNorth),
+                `${formatDistance(constellation.nearestPc, state.unit)} – ${formatDistance(constellation.farthestPc, state.unit)}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             >
-              <span>{constellation.latin}</span>
+              <span className="constellation-name">
+                {constellation.name}
+                {constellation.pronounce && constellation.pronounce !== constellation.name && (
+                  <span className="constellation-pronounce">{constellation.pronounce}</span>
+                )}
+              </span>
               <span className="constellation-spread">
-                {formatDistance(constellation.nearestPc, state.unit)} –{' '}
-                {formatDistance(constellation.farthestPc, state.unit)}
+                {MONTH_ABBR[constellation.visibility.bestMonth - 1]}
+                {constellation.visibility.hemisphere !== 'both' && (
+                  <span className="constellation-hemi">
+                    {constellation.visibility.hemisphere === 'northern' ? 'N' : 'S'}
+                  </span>
+                )}
               </span>
             </button>
           ))}

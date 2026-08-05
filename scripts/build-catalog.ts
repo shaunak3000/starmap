@@ -17,18 +17,21 @@ import {
   apparentMagnitude,
   equatorialToCartesian,
   spectralTypeToBv,
+  type Vec3,
 } from '../src/lib/astro.ts'
 import {
   type CatalogManifest,
   type Constellation,
+  type SkyCulture,
   type StarMeta,
   encodeDetailTier,
   encodeFieldTier,
 } from '../src/lib/catalog-format.ts'
+import { visibilityFor } from '../src/lib/visibility.ts'
 import { indexColumns, num, splitCsvRow, str } from './csv.ts'
-import { collectConstellationHips, parseStellariumSkyCulture } from './constellations.ts'
+import { collectConstellationHips, parseStellariumSkyCulture, type RawConstellation } from './constellations.ts'
 import { GrowableFloat32 } from './growable.ts'
-import { ATTRIBUTION, OUT_DIR, RAW_DIR } from './sources.ts'
+import { ATTRIBUTION, OUT_DIR, RAW_DIR, SKY_CULTURES } from './sources.ts'
 
 /**
  * Everything inside this radius is kept; constellation stars are exempt.
@@ -82,21 +85,35 @@ function makeTier(
 
 async function main() {
   const athygPath = path.join(RAW_DIR, 'athyg_40.csv.gz')
-  const skyCulturePath = path.join(RAW_DIR, 'stellarium-modern.json')
-
-  for (const required of [athygPath, skyCulturePath]) {
+  for (const required of [athygPath]) {
     if (!fs.existsSync(required)) {
       throw new Error(`missing ${required}. Run: npm run data:fetch`)
     }
   }
 
-  const rawConstellations = parseStellariumSkyCulture(
-    fs.readFileSync(skyCulturePath, 'utf8'),
-  )
-  const constellationHips = collectConstellationHips(rawConstellations)
-  console.log(
-    `Sky culture: ${rawConstellations.length} constellations referencing ${constellationHips.size} stars`,
-  )
+  // Every culture's stars must survive the distance cut, or a figure loses a
+  // limb. The union is what t0 has to guarantee, not any single culture's set.
+  const cultures = SKY_CULTURES.map((source) => {
+    const file = path.join(RAW_DIR, 'skycultures', `${source.id}.json`)
+    if (!fs.existsSync(file)) {
+      throw new Error(`missing ${file}. Run: npm run data:fetch`)
+    }
+    return {
+      source,
+      parsed: parseStellariumSkyCulture(fs.readFileSync(file, 'utf8'), source.id),
+    }
+  })
+
+  const constellationHips = new Set<number>()
+  for (const { source, parsed } of cultures) {
+    const hips = collectConstellationHips(parsed.constellations)
+    for (const hip of hips) constellationHips.add(hip)
+    console.log(
+      `  ${source.id.padEnd(16)} ${String(parsed.constellations.length).padStart(4)} figures, ` +
+        `${String(hips.size).padStart(5)} stars${parsed.lunarSystem ? '  (lunar system)' : ''}`,
+    )
+  }
+  console.log(`Sky cultures: ${cultures.length}, union of ${constellationHips.size} stars\n`)
 
   const tiers = [
     makeTier('naked-eye + named', 't0.bin', T0_MAG_LIMIT, 'detail'),
@@ -240,7 +257,8 @@ async function main() {
     }
   }
 
-  const constellations = buildConstellations(rawConstellations, hipToT0Index, tiers[0])
+  // The modern set drives the summary report and stays the default culture.
+  const constellations = buildConstellations(cultures[0].parsed.constellations, hipToT0Index, tiers[0])
 
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
@@ -252,10 +270,30 @@ async function main() {
   }
 
   fs.writeFileSync(path.join(OUT_DIR, 't0.meta.json'), JSON.stringify(meta))
-  fs.writeFileSync(
-    path.join(OUT_DIR, 'constellations.json'),
-    JSON.stringify(constellations),
-  )
+
+  // One file per culture, loaded on demand. Chinese alone is 318 figures; there
+  // is no reason to ship all of them to someone who only ever looks at Orion.
+  const shipped: SkyCulture[] = []
+  for (const { source, parsed } of cultures) {
+    const built = buildConstellations(parsed.constellations, hipToT0Index, tiers[0])
+    const file = `constellations.${source.id}.json`
+    fs.writeFileSync(path.join(OUT_DIR, file), JSON.stringify(built))
+
+    shipped.push({
+      id: source.id,
+      label: source.label,
+      note: source.note,
+      file,
+      constellationCount: built.length,
+      lunarSystem: parsed.lunarSystem,
+    })
+
+    const unresolved = built.reduce((sum, c) => sum + c.missingHip.length, 0)
+    console.log(
+      `  ${source.id.padEnd(16)} ${String(built.length).padStart(4)} figures drawn, ` +
+        `${String(unresolved).padStart(4)} unresolved HIP`,
+    )
+  }
 
   const manifest: CatalogManifest = {
     generatedAt: new Date().toISOString(),
@@ -267,7 +305,7 @@ async function main() {
       count: tier.count,
       magLimit: tier.magLimit,
     })),
-    constellationCount: constellations.length,
+    cultures: shipped,
   }
   fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2))
 
@@ -275,7 +313,7 @@ async function main() {
 }
 
 function buildConstellations(
-  raw: ReturnType<typeof parseStellariumSkyCulture>,
+  raw: RawConstellation[],
   hipToT0Index: Map<number, number>,
   t0: Tier,
 ): Constellation[] {
@@ -284,6 +322,11 @@ function buildConstellations(
   const distanceOf = (index: number) => {
     const base = index * 5
     return Math.hypot(positions[base], positions[base + 1], positions[base + 2])
+  }
+
+  const positionOf = (index: number): Vec3 => {
+    const base = index * 5
+    return [positions[base], positions[base + 1], positions[base + 2]]
   }
 
   return raw
@@ -312,17 +355,23 @@ function buildConstellations(
       const distances = members.map(distanceOf)
 
       return {
-        id: constellation.abbreviation,
-        latin: constellation.latin,
-        english: constellation.english,
+        id: constellation.id,
+        name: constellation.name,
+        ...(constellation.english ? { english: constellation.english } : {}),
+        ...(constellation.native ? { native: constellation.native } : {}),
+        ...(constellation.pronounce ? { pronounce: constellation.pronounce } : {}),
         lines,
         members,
         missingHip,
         nearestPc: distances.length ? Math.min(...distances) : 0,
         farthestPc: distances.length ? Math.max(...distances) : 0,
+        visibility: visibilityFor(members.map(positionOf)),
       }
     })
-    .sort((a, b) => a.id.localeCompare(b.id))
+    // Drop figures whose stars all fell outside the catalogue: an entry with no
+    // drawable line is just noise in the picker.
+    .filter((constellation) => constellation.lines.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 function report(
@@ -353,7 +402,7 @@ function report(
   const widest = [...constellations].sort((a, b) => b.farthestPc - a.farthestPc).slice(0, 5)
   console.log('  deepest figures (nearest -> farthest member):')
   for (const c of widest) {
-    console.log(`    ${c.id} ${c.latin.padEnd(18)} ${c.nearestPc.toFixed(1).padStart(8)} -> ${c.farthestPc.toFixed(1).padStart(8)} pc`)
+    console.log(`    ${c.id} ${c.name.padEnd(18)} ${c.nearestPc.toFixed(1).padStart(8)} -> ${c.farthestPc.toFixed(1).padStart(8)} pc`)
   }
 
   if (totalMissing > 0) {

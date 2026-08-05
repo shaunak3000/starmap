@@ -38,7 +38,11 @@ function readJson<T>(file: string): T {
 
 const manifest = readJson<CatalogManifest>('manifest.json')
 const meta = readJson<StarMeta[]>('t0.meta.json')
-const constellations = readJson<Constellation[]>('constellations.json')
+/** Every culture's figures, keyed by culture id. */
+const byCulture = new Map(
+  manifest.cultures.map((culture) => [culture.id, readJson<Constellation[]>(culture.file)]),
+)
+const constellations = byCulture.get('modern')!
 
 describe('the committed catalogue', () => {
   it('has every file the app loads on open', () => {
@@ -48,7 +52,7 @@ describe('the committed catalogue', () => {
       't1.bin',
       't2.bin',
       't0.meta.json',
-      'constellations.json',
+      ...manifest.cultures.map((culture) => culture.file),
     ]) {
       expect(fs.existsSync(path.join(CATALOG_DIR, file)), file).toBe(true)
     }
@@ -69,7 +73,7 @@ describe('the committed catalogue', () => {
 
   it('carries all 88 figures', () => {
     expect(constellations).toHaveLength(88)
-    expect(manifest.constellationCount).toBe(88)
+    expect(manifest.cultures.find((c) => c.id === 'modern')?.constellationCount).toBe(88)
   })
 })
 
@@ -136,13 +140,41 @@ describe('positions in the shipped bytes', () => {
 describe('constellation references', () => {
   const t0 = readTier('t0.bin')
 
-  it('only points at stars that exist in t0', () => {
-    for (const constellation of constellations) {
+  // Every culture indexes into the same t0, so t0 must hold the union of all
+  // their stars. Miss one and a figure quietly loses a limb in that culture only.
+  it.each([...byCulture.keys()])('resolves every %s figure into t0', (cultureId) => {
+    const figures = byCulture.get(cultureId)!
+    expect(figures.length).toBeGreaterThan(0)
+
+    for (const constellation of figures) {
+      expect(constellation.lines.length, `${cultureId}/${constellation.id}`).toBeGreaterThan(0)
       for (const index of constellation.members) {
-        expect(index, constellation.id).toBeGreaterThanOrEqual(0)
-        expect(index, constellation.id).toBeLessThan(t0.count)
+        expect(index, `${cultureId}/${constellation.id}`).toBeGreaterThanOrEqual(0)
+        expect(index, `${cultureId}/${constellation.id}`).toBeLessThan(t0.count)
       }
     }
+  })
+
+  it.each([...byCulture.keys()])('gives every %s figure a name and visibility', (cultureId) => {
+    for (const constellation of byCulture.get(cultureId)!) {
+      expect(constellation.name, constellation.id).toBeTruthy()
+      expect(constellation.visibility.bestMonth).toBeGreaterThanOrEqual(1)
+      expect(constellation.visibility.bestMonth).toBeLessThanOrEqual(12)
+      expect(['northern', 'southern', 'both']).toContain(constellation.visibility.hemisphere)
+    }
+  })
+
+  it('carries the Indian nakshatras as a lunar system', () => {
+    // The reason Indian is worth shipping: it divides the sky by the Moon's
+    // path rather than grouping stars into pictures.
+    expect(manifest.cultures.find((culture) => culture.id === 'indian')?.lunarSystem).toBe(true)
+    // Aśvinī is the first nakshatra.
+    expect(byCulture.get('indian')!.some((c) => c.pronounce?.startsWith('Aśvinī'))).toBe(true)
+  })
+
+  it('keeps native names in their own script', () => {
+    expect(byCulture.get('chinese')!.some((c) => /[一-鿿]/.test(c.native ?? ''))).toBe(true)
+    expect(byCulture.get('indian')!.some((c) => /[ऀ-ॿ]/.test(c.native ?? ''))).toBe(true)
   })
 
   it('reports a spread matching the member positions', () => {

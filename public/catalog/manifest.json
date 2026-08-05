@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T03:21:26.750Z",
+  "generatedAt": "2026-08-05T15:16:43.808Z",
   "maxDistancePc": 3000,
   "sources": [
     {
@@ -22,21 +22,54 @@
     {
       "name": "naked-eye + named",
       "file": "t0.bin",
-      "count": 8292,
+      "count": 8351,
       "magLimit": 6.5
     },
     {
       "name": "to magnitude 9",
       "file": "t1.bin",
-      "count": 111696,
+      "count": 111640,
       "magLimit": 9
     },
     {
       "name": "faint field",
       "file": "t2.bin",
-      "count": 2378331,
+      "count": 2378330,
       "magLimit": null
     }
   ],
-  "constellationCount": 88
+  "cultures": [
+    {
+      "id": "modern",
+      "label": "Modern (IAU)",
+      "note": "The 88 official constellations, inherited from Greek and Roman tradition.",
+      "file": "constellations.modern.json",
+      "constellationCount": 88,
+      "lunarSystem": false
+    },
+    {
+      "id": "chinese",
+      "label": "Chinese",
+      "note": "Hundreds of small asterisms — an imperial bureaucracy mapped onto the sky.",
+      "file": "constellations.chinese.json",
+      "constellationCount": 309,
+      "lunarSystem": true
+    },
+    {
+      "id": "indian",
+      "label": "Indian (Nakshatras)",
+      "note": "Lunar mansions dividing the sky along the Moon’s monthly path, not the Sun’s.",
+      "file": "constellations.indian.json",
+      "constellationCount": 50,
+      "lunarSystem": true
+    },
+    {
+      "id": "arabic_al-sufi",
+      "label": "Arabic (al-Sufi)",
+      "note": "From the tenth-century Book of Fixed Stars, source of most star names we still use.",
+      "file": "constellations.arabic_al-sufi.json",
+      "constellationCount": 51,
+      "lunarSystem": true
+    }
+  ]
 }

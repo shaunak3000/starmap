@@ -28,8 +28,8 @@ const ROTATE_DAMPING = 18
 const DISTANCE_DAMPING = 13
 const TARGET_DAMPING = 13
 /** Slower rates while a scripted flight is in progress, so travel reads as travel. */
-const FLIGHT_DAMPING = 3.2
-const FLIGHT_DURATION_MS = 2200
+const FLIGHT_DAMPING = 5.5
+const FLIGHT_DURATION_MS = 1400
 
 interface RigState {
   yaw: number

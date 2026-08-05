@@ -21,6 +21,47 @@ export interface RemoteSource {
   gzipped: boolean
 }
 
+export interface SkyCultureSource {
+  /** Stellarium's directory name, and our key for the culture. */
+  id: string
+  /** How it is offered in the UI. */
+  label: string
+  /** One line on what makes this culture's sky different. */
+  note: string
+}
+
+/**
+ * The sky cultures we ship.
+ *
+ * The point of carrying more than one is that the same stars regroup entirely:
+ * the figures are a cultural artefact, not a property of the sky. Indian earns
+ * its place above larger sets because the nakshatras divide the sky by the
+ * Moon's monthly path rather than grouping bright stars into pictures — a
+ * different organising principle, not just different drawings.
+ */
+export const SKY_CULTURES: SkyCultureSource[] = [
+  {
+    id: 'modern',
+    label: 'Modern (IAU)',
+    note: 'The 88 official constellations, inherited from Greek and Roman tradition.',
+  },
+  {
+    id: 'chinese',
+    label: 'Chinese',
+    note: 'Hundreds of small asterisms — an imperial bureaucracy mapped onto the sky.',
+  },
+  {
+    id: 'indian',
+    label: 'Indian (Nakshatras)',
+    note: 'Lunar mansions dividing the sky along the Moon’s monthly path, not the Sun’s.',
+  },
+  {
+    id: 'arabic_al-sufi',
+    label: 'Arabic (al-Sufi)',
+    note: 'From the tenth-century Book of Fixed Stars, source of most star names we still use.',
+  },
+]
+
 export const SOURCES: RemoteSource[] = [
   {
     key: 'athyg',
@@ -31,12 +72,12 @@ export const SOURCES: RemoteSource[] = [
     bytes: 199688001,
     gzipped: true,
   },
-  {
-    key: 'stellarium',
-    file: 'stellarium-modern.json',
-    url: `https://raw.githubusercontent.com/Stellarium/stellarium/${STELLARIUM_TAG}/skycultures/modern/index.json`,
+  ...SKY_CULTURES.map((culture) => ({
+    key: `skyculture:${culture.id}`,
+    file: `skycultures/${culture.id}.json`,
+    url: `https://raw.githubusercontent.com/Stellarium/stellarium/${STELLARIUM_TAG}/skycultures/${culture.id}/index.json`,
     gzipped: false,
-  },
+  })),
 ]
 
 export const ATTRIBUTION = [

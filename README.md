@@ -23,8 +23,14 @@ replays it.
 
 - **2.5M stars** from AT-HYG v4 (Gaia DR3 astrometry, with Hipparcos filling the
   bright end Gaia saturates on), rendered as a GPU point cloud.
-- **All 88 IAU constellations**, joined to the catalogue by HIP number, drawn at
-  their stars' true 3D positions.
+- **Four sky cultures** over the same stars — modern (88 figures), Chinese
+  (309), Indian nakshatras (50) and Arabic al-Sufi (51) — joined to the
+  catalogue by HIP number and drawn at their stars' true 3D positions. Swap
+  culture and the sky reorganises completely: the figures are a cultural
+  artefact, not a property of the sky.
+- **Season and hemisphere** for every figure, derived from its own stars: the
+  month it transits at local midnight, its transit altitude from mid-northern
+  and mid-southern latitudes, and whether it is circumpolar or never rises.
 - **Three viewpoints.** Earth POV is a planetarium locked to the Sun. Orbit
   circles any star or figure. Fly is free movement through the volume.
 - **A depth slider** that collapses every star onto a single shell — the sky the
@@ -35,6 +41,16 @@ replays it.
   as you zoom, and an isolate mode that strips the view to one figure.
 - **Star inspection**: click any naked-eye or named star for distance,
   magnitudes, temperature and spectral class.
+
+### The same stars, other people's sky
+
+![The Chinese sky over the same stars](docs/images/culture-chinese.png)
+
+Nothing about the stars changed — only who was looking. Where the Western set
+draws a hunter, the Chinese set draws hundreds of small asterisms; the Indian
+nakshatras divide the sky along the Moon's monthly path instead. Names are shown
+in their own script with romanisation, and each figure carries the month it is
+best seen and which hemisphere can see it.
 
 ### Where we actually are
 
@@ -76,7 +92,7 @@ npm run data     # downloads ~190 MB, packs the binary tiers (one time)
 npm run dev
 ```
 
-`npm run data` fetches AT-HYG and the Stellarium sky culture into `data/raw/`,
+`npm run data` fetches AT-HYG and the four Stellarium sky cultures into `data/raw/`,
 then writes binary tiers into `public/catalog/`. Both directories are
 gitignored and fully reproducible.
 
@@ -113,9 +129,9 @@ magnitude so the app can show something immediately and stream the rest:
 
 | tier | stars | precision | size | contents |
 | --- | --- | --- | --- | --- |
-| `t0.bin` | 8,292 | float32 | 0.16 MB | naked-eye and named, with metadata |
-| `t1.bin` | 111,696 | float16 | 1.1 MB | down to magnitude 9 |
-| `t2.bin` | 2,378,331 | float16 | 22.7 MB | the faint field, loaded on demand |
+| `t0.bin` | 8,351 | float32 | 0.16 MB | naked-eye and named, with metadata |
+| `t1.bin` | 111,640 | float16 | 1.1 MB | down to magnitude 9 |
+| `t2.bin` | 2,378,330 | float16 | 22.7 MB | the faint field, loaded on demand |
 
 Only `t0` is read by the CPU — picking, constellation geometry, search and the
 star card all index into it, and it holds the stars you fly to and quote
@@ -135,7 +151,10 @@ catalogue's own cartesian columns; the two agree to 1.3e-4 pc across all 2.5M
 stars, which is the pipeline's main correctness check.
 
 Stars anchoring a constellation are kept even when they fall outside 3,000 pc —
-otherwise Orion loses a shoulder.
+otherwise Orion loses a shoulder. That guarantee applies to the **union** of all
+four cultures' stars (1,718 of them), not just the Western set; adding three
+cultures grew t0 by only 59 stars, because their figures are drawn from bright
+stars that were already there.
 
 **Why the cut is at 3 kpc.** It is where Gaia's parallaxes stop being
 defensible for ordinary stars. The catalogue's own distance histogram shows the

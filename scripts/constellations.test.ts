@@ -26,9 +26,9 @@ const FIXTURE = JSON.stringify({
 
 describe('parseStellariumSkyCulture', () => {
   it('extracts abbreviation, names and polylines', () => {
-    const [orion] = parseStellariumSkyCulture(FIXTURE)
-    expect(orion.abbreviation).toBe('Ori')
-    expect(orion.latin).toBe('Orion')
+    const [orion] = parseStellariumSkyCulture(FIXTURE).constellations
+    expect(orion.id).toBe('Ori')
+    expect(orion.name).toBe('Orion')
     expect(orion.english).toBe('Hunter')
     expect(orion.lines).toEqual([
       [26727, 26311, 25930],
@@ -37,17 +37,17 @@ describe('parseStellariumSkyCulture', () => {
   })
 
   it('deduplicates HIP ids shared between polylines', () => {
-    const [orion] = parseStellariumSkyCulture(FIXTURE)
+    const [orion] = parseStellariumSkyCulture(FIXTURE).constellations
     expect(orion.hips).toEqual([26727, 26311, 25930, 24436])
   })
 
   it('falls back to the Latin name when English is absent', () => {
-    const uma = parseStellariumSkyCulture(FIXTURE).find((c) => c.abbreviation === 'UMa')!
-    expect(uma.english).toBe('Ursa Major')
+    const uma = parseStellariumSkyCulture(FIXTURE).constellations.find((c) => c.id === 'UMa')!
+    expect(uma.name).toBe('Ursa Major')
   })
 
   it('drops figures whose polylines are too short to draw', () => {
-    const ids = parseStellariumSkyCulture(FIXTURE).map((c) => c.abbreviation)
+    const ids = parseStellariumSkyCulture(FIXTURE).constellations.map((c) => c.id)
     expect(ids).not.toContain('Bad')
     expect(ids).not.toContain('Empty')
   })
@@ -59,7 +59,7 @@ describe('parseStellariumSkyCulture', () => {
 
 describe('collectConstellationHips', () => {
   it('unions HIP ids across figures', () => {
-    const hips = collectConstellationHips(parseStellariumSkyCulture(FIXTURE))
+    const hips = collectConstellationHips(parseStellariumSkyCulture(FIXTURE).constellations)
     expect(hips.has(26727)).toBe(true)
     expect(hips.has(54061)).toBe(true)
     expect(hips.size).toBe(6)
@@ -71,27 +71,28 @@ describe('collectConstellationHips', () => {
 // never fetches it. The read has to be lazy: `describe.runIf` still executes
 // the callback to collect tests, so an eager readFileSync throws even when the
 // suite is going to be skipped.
-const realSkyCulture = path.join(RAW_DIR, 'stellarium-modern.json')
+const realSkyCulture = path.join(RAW_DIR, 'skycultures', 'modern.json')
 describe.runIf(fs.existsSync(realSkyCulture))('the pinned Stellarium sky culture', () => {
-  let parsed: ReturnType<typeof parseStellariumSkyCulture>
+  let parsed: ReturnType<typeof parseStellariumSkyCulture>['constellations']
 
   beforeAll(() => {
-    parsed = parseStellariumSkyCulture(fs.readFileSync(realSkyCulture, 'utf8'))
+    parsed = parseStellariumSkyCulture(fs.readFileSync(realSkyCulture, 'utf8')).constellations
   })
 
   it('yields all 88 IAU constellations', () => {
     expect(parsed).toHaveLength(88)
   })
 
-  it('gives every figure a three-letter abbreviation', () => {
+  // Only the modern set uses IAU codes; Chinese ids look like "001".
+  it('gives every modern figure a three-letter IAU abbreviation', () => {
     for (const constellation of parsed) {
-      expect(constellation.abbreviation).toMatch(/^[A-Z][A-Za-z]{2}$/)
+      expect(constellation.id).toMatch(/^[A-Z][A-Za-z]{2}$/)
     }
   })
 
   it('includes Orion with a plausible figure', () => {
-    const orion = parsed.find((c) => c.abbreviation === 'Ori')!
-    expect(orion.latin).toBe('Orion')
+    const orion = parsed.find((c) => c.id === 'Ori')!
+    expect(orion.name).toBe('Orion')
     // Betelgeuse (27989) and Rigel (24436) both anchor the figure.
     expect(orion.hips).toContain(27989)
     expect(orion.hips).toContain(24436)

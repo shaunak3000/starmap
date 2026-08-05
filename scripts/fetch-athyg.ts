@@ -21,6 +21,7 @@ function formatBytes(n: number): string {
 
 async function download(source: RemoteSource): Promise<void> {
   const dest = path.join(RAW_DIR, source.file)
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
 
   if (fs.existsSync(dest)) {
     const size = fs.statSync(dest).size

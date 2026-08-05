@@ -23,8 +23,14 @@ export interface LoadedCatalog {
   meta: StarMeta[]
   /** Metadata by tier-0 index. */
   metaByIndex: Map<number, StarMeta>
+  /** Figures of the currently selected sky culture. */
   constellations: Constellation[]
+  /** Which culture those figures came from. */
+  cultureId: string
 }
+
+/** The default culture: the one most viewers will recognise. */
+export const DEFAULT_CULTURE = 'modern'
 
 async function fetchJson<T>(file: string): Promise<T> {
   const response = await fetch(`${CATALOG_BASE}${file}`)
@@ -63,18 +69,35 @@ export async function loadFieldTier(file: string): Promise<FieldTier> {
  * Loads everything needed for a first frame. The faint field (t2) is deliberately
  * left out — it is an order of magnitude larger and only fetched on demand.
  */
-export async function loadCatalog(): Promise<LoadedCatalog> {
-  const [manifest, t0, t1, meta, constellations] = await Promise.all([
-    fetchJson<CatalogManifest>('manifest.json'),
+export async function loadCatalog(cultureId = DEFAULT_CULTURE): Promise<LoadedCatalog> {
+  const manifest = await fetchJson<CatalogManifest>('manifest.json')
+
+  const [t0, t1, meta, constellations] = await Promise.all([
     loadDetailTier('t0.bin'),
     loadFieldTier('t1.bin'),
     fetchJson<StarMeta[]>('t0.meta.json'),
-    fetchJson<Constellation[]>('constellations.json'),
+    loadConstellations(manifest, cultureId),
   ])
 
   const metaByIndex = new Map(meta.map((entry) => [entry.i, entry]))
 
-  return { manifest, t0, t1, meta, metaByIndex, constellations }
+  return { manifest, t0, t1, meta, metaByIndex, constellations, cultureId }
+}
+
+/**
+ * Figures for one sky culture. Kept separate from the star tiers because the
+ * stars never change — only the lines drawn between them do. Chinese alone is
+ * 309 figures; there is no reason to ship it to someone looking at Orion.
+ */
+export async function loadConstellations(
+  manifest: CatalogManifest,
+  cultureId: string,
+): Promise<Constellation[]> {
+  const culture = manifest.cultures.find((entry) => entry.id === cultureId)
+  if (!culture) {
+    throw new Error(`unknown sky culture "${cultureId}"`)
+  }
+  return fetchJson<Constellation[]>(culture.file)
 }
 
 /** Human-readable label for a star, falling back through its identifiers. */

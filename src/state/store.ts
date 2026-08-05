@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { CatalogTier } from '../lib/catalog-format.ts'
-import { type LoadedCatalog, loadCatalog, loadTier } from '../lib/catalog-loader.ts'
+import {
+  DEFAULT_CULTURE,
+  type LoadedCatalog,
+  loadCatalog,
+  loadConstellations,
+  loadTier,
+} from '../lib/catalog-loader.ts'
 import { constellationVantage } from '../lib/constellation-view.ts'
 import { galacticToEquatorial } from '../lib/astro.ts'
 import { galacticCentre } from '../lib/galaxy.ts'
@@ -93,6 +99,11 @@ interface StarmapState {
   focusRequest: FocusRequest | null
   /** Index of the running tour step, or null when no tour is playing. */
   tourStep: number | null
+  /** Which sky culture's figures are drawn. */
+  skyCulture: string
+  cultureLoading: boolean
+  /** Which hemisphere visibility summaries are quoted for. */
+  viewerNorth: boolean
   /** Metres-per-second equivalent for fly mode, in parsecs per second. */
   flySpeed: number
   /** Live camera distance from the Sun, mirrored out of the rig for the HUD. */
@@ -118,6 +129,8 @@ interface StarmapState {
   orientView: (preset: ViewPreset) => void
   /** Back to the opening view: standing on the Sun, looking out. */
   resetView: () => void
+  /** Swaps which culture's figures are drawn over the same stars. */
+  setSkyCulture: (cultureId: string) => Promise<void>
   startTour: () => void
   stopTour: () => void
   setTourStep: (step: number) => void
@@ -158,6 +171,9 @@ export const useStarmap = create<StarmapState>((set, get) => ({
 
   focusRequest: null,
   tourStep: null,
+  skyCulture: DEFAULT_CULTURE,
+  cultureLoading: false,
+  viewerNorth: true,
   flySpeed: 5,
   cameraDistancePc: 60,
   fps: 0,
@@ -208,6 +224,34 @@ export const useStarmap = create<StarmapState>((set, get) => ({
       dissolve: id === null ? 1 : state.dissolve,
       sphereRadiusPc: id === null ? DEFAULT_SPHERE_RADIUS_PC : state.sphereRadiusPc,
     })),
+
+  setSkyCulture: async (cultureId) => {
+    const { catalog, skyCulture } = get()
+    if (!catalog || cultureId === skyCulture) return
+
+    set({ cultureLoading: true })
+    try {
+      const constellations = await loadConstellations(catalog.manifest, cultureId)
+      set((state) => ({
+        skyCulture: cultureId,
+        cultureLoading: false,
+        showConstellations: true,
+        // Figure ids do not carry across cultures — Orion has no counterpart in
+        // the nakshatras — so any active selection has to go.
+        activeConstellation: null,
+        dissolve: 1,
+        sphereRadiusPc: DEFAULT_SPHERE_RADIUS_PC,
+        catalog: state.catalog
+          ? { ...state.catalog, constellations, cultureId }
+          : state.catalog,
+      }))
+    } catch (error) {
+      set({
+        cultureLoading: false,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  },
 
   startTour: () => set({ tourStep: 0 }),
 
