@@ -41,6 +41,8 @@ replays it.
   as you zoom, and an isolate mode that strips the view to one figure.
 - **Star inspection**: click any naked-eye or named star for distance,
   magnitudes, temperature and spectral class.
+- **Shareable views** — the address bar tracks culture, figure, camera, layers
+  and frame, so any view can be sent as a link and survives a refresh.
 
 ### The same stars, other people's sky
 
@@ -99,6 +101,7 @@ gitignored and fully reproducible.
 ```bash
 npm test             # unit tests
 npm run check:camera # drives real pointer/wheel input at a running dev server
+npm run check:links  # proves a shared link restores the view it captured
 npm run build        # production bundle
 ```
 

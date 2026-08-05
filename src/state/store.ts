@@ -49,6 +49,23 @@ export interface FocusRequest {
 /** Canonical viewing angles, relative to whichever frame is active. */
 export type ViewPreset = 'top' | 'edge'
 
+/**
+ * Where the camera is and which way it faces, in the rig's own terms.
+ *
+ * Published by the rig once motion settles so the URL can capture a view, and
+ * consumed back on load to restore one. Kept in rig terms rather than as a
+ * world matrix because that is what restores exactly.
+ */
+export interface CameraPose {
+  mode: CameraMode
+  /** Focus point in catalogue coordinates. */
+  target: [number, number, number]
+  distance: number
+  yaw: number
+  pitch: number
+  fov: number
+}
+
 /** Shell radius used when no figure is driving it. */
 export const DEFAULT_SPHERE_RADIUS_PC = 120
 
@@ -111,6 +128,10 @@ interface StarmapState {
   flySpeed: number
   /** Live camera distance from the Sun, mirrored out of the rig for the HUD. */
   cameraDistancePc: number
+  /** Settled camera pose, published by the rig for the URL to capture. */
+  cameraPose: CameraPose | null
+  /** A pose to restore; the rig consumes it once and snaps to it. */
+  poseRequest: (CameraPose & { token: number }) | null
   /** Rolling frame rate, published by FrameMeter. */
   fps: number
 
@@ -137,6 +158,8 @@ interface StarmapState {
   startTour: () => void
   stopTour: () => void
   setTourStep: (step: number) => void
+  /** Restores a previously captured view, e.g. from a shared link. */
+  restorePose: (pose: CameraPose) => void
 }
 
 export const useStarmap = create<StarmapState>((set, get) => ({
@@ -180,6 +203,8 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   viewerNorth: true,
   flySpeed: 5,
   cameraDistancePc: 60,
+  cameraPose: null,
+  poseRequest: null,
   fps: 0,
 
   init: async () => {
@@ -256,6 +281,12 @@ export const useStarmap = create<StarmapState>((set, get) => ({
       })
     }
   },
+
+  restorePose: (pose) =>
+    set((state) => ({
+      cameraMode: pose.mode,
+      poseRequest: { ...pose, token: (state.poseRequest?.token ?? 0) + 1 },
+    })),
 
   startTour: () => set({ tourStep: 0 }),
 

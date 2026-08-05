@@ -7,6 +7,7 @@ import {
   useStarmap,
 } from '../state/store.ts'
 import { Section, Segmented, Slider } from './controls.tsx'
+import { ShareButton } from './ShareButton.tsx'
 import { formatDistance } from './format.ts'
 
 /**
@@ -64,6 +65,14 @@ export function ViewPanel() {
           </button>
           <p className="hint">
             Real stars reach 3 kpc; the disk and arms beyond that are a model.
+          </p>
+        </Section>
+
+        <Section title="Share">
+          <ShareButton />
+          <p className="hint">
+            The address bar tracks whatever you are looking at, so any view can
+            be sent as a link.
           </p>
         </Section>
 

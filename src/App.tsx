@@ -9,6 +9,7 @@ import { LayersPanel } from './ui/LayersPanel.tsx'
 import { SearchBox } from './ui/SearchBox.tsx'
 import { StarCard } from './ui/StarCard.tsx'
 import { Tour } from './ui/Tour.tsx'
+import { UrlSync } from './ui/UrlSync.tsx'
 import { ViewPanel } from './ui/ViewPanel.tsx'
 
 function LoadState() {
@@ -83,6 +84,7 @@ export default function App() {
           <Hud />
           <LabelLayer />
           <Tour />
+          <UrlSync />
         </>
       )}
     </div>

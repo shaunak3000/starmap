@@ -350,6 +350,25 @@ export function CameraRig() {
     }
   }, [focusRequest, dataToWorld, scratch])
 
+  // Declared after the mode and focus effects on purpose: restorePose sets the
+  // mode too, and effects run in declaration order, so an earlier pose effect
+  // would be clobbered by the mode effect in the same commit.
+  // A restored pose snaps rather than flies: it is where the viewer already
+  // expected to be, so animating to it would just be a delay.
+  const poseRequest = useStarmap((state) => state.poseRequest)
+  useEffect(() => {
+    if (!poseRequest) return
+    for (const state of [desired.current, actual.current]) {
+      state.target.set(...poseRequest.target)
+      state.distance = poseRequest.distance
+      state.yaw = poseRequest.yaw
+      state.pitch = poseRequest.pitch
+      state.fov = poseRequest.fov
+    }
+    if (poseRequest.distance > 0) lastOrbitDistance.current = poseRequest.distance
+    flightUntil.current = 0
+  }, [poseRequest])
+
   useFrame((_, rawDelta) => {
     // Clamp so a stalled tab does not teleport the camera on the next frame.
     const dt = Math.min(rawDelta, 0.1)
@@ -431,7 +450,51 @@ export function CameraRig() {
     if (Math.abs(distanceFromSun - reported) > Math.max(reported * 0.01, 0.005)) {
       useStarmap.setState({ cameraDistancePc: distanceFromSun })
     }
+
+    publishPose(now, goal)
   })
+
+  /**
+   * Publishes the pose once motion has settled.
+   *
+   * Only on settle, because this is what the URL captures — rewriting the
+   * address bar every frame of a drag would be absurd, and a half-finished
+   * camera move is not a view anyone wants to share.
+   */
+  function publishPose(current: RigState, goal: RigState) {
+    const settled =
+      Math.abs(current.yaw - goal.yaw) < 1e-3 &&
+      Math.abs(current.pitch - goal.pitch) < 1e-3 &&
+      Math.abs(current.distance - goal.distance) < Math.max(goal.distance * 1e-3, 1e-4) &&
+      current.target.distanceToSquared(goal.target) < 1e-6
+
+    if (!settled) return
+
+    const previous = useStarmap.getState().cameraPose
+    const pose = {
+      mode: modeRef.current,
+      target: [current.target.x, current.target.y, current.target.z] as [number, number, number],
+      distance: current.distance,
+      yaw: current.yaw,
+      pitch: current.pitch,
+      fov: current.fov,
+    }
+
+    if (
+      previous &&
+      previous.mode === pose.mode &&
+      Math.abs(previous.yaw - pose.yaw) < 1e-3 &&
+      Math.abs(previous.pitch - pose.pitch) < 1e-3 &&
+      Math.abs(previous.distance - pose.distance) < Math.max(pose.distance * 1e-3, 1e-4) &&
+      Math.abs(previous.target[0] - pose.target[0]) < 1e-3 &&
+      Math.abs(previous.target[1] - pose.target[1]) < 1e-3 &&
+      Math.abs(previous.target[2] - pose.target[2]) < 1e-3
+    ) {
+      return
+    }
+
+    useStarmap.setState({ cameraPose: pose })
+  }
 
   return null
 }
