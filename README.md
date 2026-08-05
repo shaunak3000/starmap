@@ -19,6 +19,27 @@ instant you touch anything, and hands over the exact view it was mid-shot on,
 because its steps write to the same store the controls do. "Take the tour"
 replays it.
 
+## Jump straight in
+
+Every view has a link, so these open exactly where they say — no clicking
+around first:
+
+- [**Orion, revealed side-on**](https://shaunak3000.github.io/starmap/#fig=Ori&cam=orbit,18.5,190.09,26.24,501.214,4.6154,0,60)
+  — the hunter, seen from off Earth's line of sight
+- [**Canis Major, alone**](https://shaunak3000.github.io/starmap/#fig=CMa&cam=orbit,-84.24,316.47,-144.85,931.032,4.9725,0,60&on=i)
+  — Sirius at 9 light years, Aludra at 1,989
+- [**The Chinese sky**](https://shaunak3000.github.io/starmap/#cul=chinese&cam=earth,0,0,0,0.02,3.1416,0,60)
+  — the same stars, 309 figures instead of 88
+- [**The Indian nakshatras**](https://shaunak3000.github.io/starmap/#cul=indian&cam=earth,0,0,0,0.02,3.1416,0,60)
+  — the sky divided by the Moon's path rather than into pictures
+- [**Our place in the Milky Way**](https://shaunak3000.github.io/starmap/#cam=orbit,-447.24,-7118.51,-3943.26,29999.975,1.7952,-0.4735,60&on=w)
+  — the Sun on the Local Arm, 8.15 kpc out
+- [**The sky the constellations assume**](https://shaunak3000.github.io/starmap/#fig=Ori&cam=orbit,18.5,190.09,26.24,501.226,4.6154,0,60&dep=0)
+  — every star collapsed onto one shell
+
+`npm run make:links` regenerates these by driving the real app and reading back
+the hash it wrote, so none of them is a link nobody has opened.
+
 ## What it does
 
 - **2.5M stars** from AT-HYG v4 (Gaia DR3 astrometry, with Hipparcos filling the

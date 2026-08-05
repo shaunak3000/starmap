@@ -15,7 +15,8 @@
     "data": "npm run data:fetch && npm run data:build",
     "check:camera": "tsx scripts/check-camera.ts",
     "shoot": "tsx scripts/shoot.ts",
-    "check:links": "tsx scripts/check-links.ts"
+    "check:links": "tsx scripts/check-links.ts",
+    "make:links": "tsx scripts/make-links.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

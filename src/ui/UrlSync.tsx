@@ -50,8 +50,18 @@ export function useInitialUrlState() {
     if (initial.star !== undefined) store.select(initial.star)
 
     const finish = () => {
-      // Set the figure after any culture swap, since ids are culture-scoped.
-      if (initial.figure) useStarmap.getState().setActiveConstellation(initial.figure)
+      const current = useStarmap.getState()
+
+      // Figure ids are culture-scoped: "CMa" means nothing in the Chinese set.
+      // A link carrying one from another culture must be ignored rather than
+      // left dangling, or the UI offers to clear a selection that is not there.
+      if (
+        initial.figure &&
+        current.catalog?.constellations.some((c) => c.id === initial.figure)
+      ) {
+        current.setActiveConstellation(initial.figure)
+      }
+
       // Pose last: it must not be overwritten by the mode changes above.
       if (initial.pose) useStarmap.getState().restorePose(initial.pose)
     }
