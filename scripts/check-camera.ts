@@ -188,6 +188,56 @@ async function main() {
   await page.evaluate(`window.__starmap.getState().set('cameraMode', 'orbit')`)
   await page.waitForTimeout(2000)
 
+  /*
+   * Selecting a figure then switching to Earth POV must land looking at it.
+   * A side-on reveal parks the camera perpendicular to the figure's line of
+   * sight on purpose, so inheriting that heading used to drop the viewer into
+   * the planetarium pointing ninety degrees away from what they had just asked
+   * to see.
+   */
+  await page.evaluate(`window.__starmap.getState().revealConstellation('Ori')`)
+  await settle()
+  await settle()
+
+  await page.evaluate(`window.__starmap.getState().set('cameraMode', 'earth')`)
+  await settle()
+  await settle()
+
+  const offsetDeg = (await page.evaluate(`(() => {
+    const THREE = window.__three
+    const s = window.__starmap.getState()
+    const c = s.__camera
+    const cat = s.catalog
+    const ori = cat.constellations.find((x) => x.id === 'Ori')
+
+    // Mean direction of the figure's members, in world space.
+    const sum = new THREE.Vector3()
+    for (const i of ori.members) {
+      const b = i * 5
+      sum.add(new THREE.Vector3(
+        cat.t0.attributes[b], cat.t0.attributes[b + 1], cat.t0.attributes[b + 2],
+      ).normalize())
+    }
+    sum.normalize()
+
+    // The scene group maps astronomical Z-up onto three.js Y-up.
+    const world = new THREE.Vector3(sum.x, sum.z, -sum.y)
+    const facing = new THREE.Vector3()
+    c.getWorldDirection(facing)
+    return (facing.angleTo(world) * 180) / Math.PI
+  })()`)) as number
+
+  check(
+    'earth POV faces the selected figure',
+    offsetDeg < 20,
+    `${offsetDeg.toFixed(1)}deg off centre`,
+  )
+
+  await page.evaluate(`window.__starmap.getState().resetView()`)
+  await settle()
+  await page.evaluate(`window.__starmap.getState().set('cameraMode', 'orbit')`)
+  await settle()
+
   check(
     'wheel dollies out',
     zoomedOut.distance > before.distance * 1.3,

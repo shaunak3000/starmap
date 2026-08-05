@@ -291,6 +291,27 @@ export function CameraRig() {
     const state = desired.current
 
     if (cameraMode === 'earth') {
+      /*
+       * Turn to face whatever was being examined, rather than keeping the orbit
+       * heading. A side-on reveal deliberately parks the camera perpendicular to
+       * the figure's line of sight, so inheriting that heading dropped the
+       * viewer into the planetarium pointing ninety degrees away from the very
+       * constellation they had just selected. Standing on the Sun and looking
+       * toward the old focus point is the same direction as looking at it.
+       */
+      if (state.target.lengthSq() > 1e-6) {
+        scratch.dir.copy(state.target).applyMatrix4(dataToWorld).normalize()
+        state.pitch = Math.max(
+          -PITCH_LIMIT,
+          Math.min(PITCH_LIMIT, Math.asin(THREE.MathUtils.clamp(scratch.dir.y, -1, 1))),
+        )
+
+        const heading = Math.atan2(scratch.dir.x, scratch.dir.z)
+        // Yaw is unbounded, so turn the short way rather than unwinding turns.
+        const turns = Math.round((actual.current.yaw - heading) / (Math.PI * 2))
+        state.yaw = heading + turns * Math.PI * 2
+      }
+
       state.target.set(0, 0, 0)
       state.distance = 0
     } else if (cameraMode === 'fly') {
@@ -305,7 +326,7 @@ export function CameraRig() {
       state.distance = Math.max(lastOrbitDistance.current, MIN_DISTANCE_PC)
       state.fov = DEFAULT_FOV
     }
-  }, [cameraMode, scratch])
+  }, [cameraMode, scratch, dataToWorld])
 
   // Travel requests from search, star selection and constellation focus.
   useEffect(() => {
