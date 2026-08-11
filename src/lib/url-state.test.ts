@@ -63,6 +63,31 @@ describe('round trip', () => {
   })
 })
 
+describe('epoch and population', () => {
+  it('round-trips a scrubbed epoch', () => {
+    expect(roundTrip({ years: -75_000 }).years).toBe(-75_000)
+  })
+
+  it('omits the present epoch, so an ordinary link stays short', () => {
+    expect(encodeUrlState({ years: 0 })).toBe('')
+  })
+
+  it('clamps an out-of-range epoch rather than trusting it', () => {
+    expect(decodeUrlState('#yr=99999999').years).toBe(100_000)
+    expect(decodeUrlState('#yr=-99999999').years).toBe(-100_000)
+  })
+
+  it('round-trips an HR brush', () => {
+    const brush = { ciMin: 0.9, ciMax: 2.5, magMin: -8, magMax: 2 }
+    expect(roundTrip({ brush }).brush).toEqual(brush)
+  })
+
+  it('ignores a malformed brush', () => {
+    expect(decodeUrlState('#hr=1,2').brush).toBeUndefined()
+    expect(decodeUrlState('#hr=a,b,c,d').brush).toBeUndefined()
+  })
+})
+
 describe('defaults', () => {
   it('encodes nothing for an empty state', () => {
     expect(encodeUrlState({})).toBe('')

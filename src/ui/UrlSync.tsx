@@ -37,6 +37,10 @@ export function useInitialUrlState() {
     if (initial.unit) store.set('unit', initial.unit)
     if (initial.dissolve !== undefined) store.set('dissolve', initial.dissolve)
     if (initial.years !== undefined) store.set('years', initial.years)
+    if (initial.brush) {
+      store.set('showHrDiagram', true)
+      store.setHrBrush(initial.brush)
+    }
 
     if (initial.layers) {
       const { layers } = initial
@@ -96,6 +100,7 @@ export function UrlSync() {
         ...(state.unit !== 'ly' ? { unit: state.unit } : {}),
         ...(state.dissolve !== 1 ? { dissolve: state.dissolve } : {}),
         ...(state.years !== 0 ? { years: state.years } : {}),
+        ...(state.hrBrush ? { brush: state.hrBrush } : {}),
       }
 
       // Only layers that differ from their defaults, so the common link is short.

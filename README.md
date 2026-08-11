@@ -36,6 +36,10 @@ around first:
   — the Sun on the Local Arm, 8.15 kpc out
 - [**The sky the constellations assume**](https://shaunak3000.github.io/starmap/#fig=Ori&cam=orbit,18.5,190.09,26.24,501.226,4.6154,0,60&dep=0)
   — every star collapsed onto one shell
+- [**The sky in 100,000 years**](https://shaunak3000.github.io/starmap/#yr=100000&cam=earth,0,0,0,0.02,3.1416,0,60)
+  — proper motion applied; the figures have come apart
+- [**Only the red giants**](https://shaunak3000.github.io/starmap/#cam=earth,0,0,0,0.02,3.1416,0,60&hr=0.9,2.5,-8,2)
+  — a population picked off the HR diagram, and the sky turns gold
 
 `npm run make:links` regenerates these by driving the real app and reading back
 the hash it wrote, so none of them is a link nobody has opened.

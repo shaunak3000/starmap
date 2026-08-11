@@ -23,6 +23,7 @@ export interface UrlState {
   unit?: 'pc' | 'ly'
   dissolve?: number
   years?: number
+  brush?: { ciMin: number; ciMax: number; magMin: number; magMax: number }
   layers?: {
     constellations?: boolean
     labels?: boolean
@@ -99,6 +100,14 @@ export function encodeUrlState(state: UrlState): string {
   if (state.unit) params.set('u', state.unit)
   if (state.dissolve !== undefined) params.set('dep', String(round(state.dissolve, 2)))
   if (state.years !== undefined && state.years !== 0) params.set('yr', String(Math.round(state.years)))
+  if (state.brush) {
+    params.set(
+      'hr',
+      [state.brush.ciMin, state.brush.ciMax, state.brush.magMin, state.brush.magMax]
+        .map((v) => round(v, 2))
+        .join(','),
+    )
+  }
 
   if (state.layers) {
     // Written as two lists so an absent key means "leave at the default",
@@ -155,6 +164,14 @@ export function decodeUrlState(hash: string): UrlState {
   if (years !== null) {
     const value = Number(years)
     if (Number.isFinite(value)) state.years = Math.min(Math.max(value, -MAX_YEARS), MAX_YEARS)
+  }
+
+  const hr = params.get('hr')
+  if (hr) {
+    const parts = hr.split(',').map(Number)
+    if (parts.length === 4 && parts.every(Number.isFinite)) {
+      state.brush = { ciMin: parts[0], ciMax: parts[1], magMin: parts[2], magMax: parts[3] }
+    }
   }
 
   const on = params.get('on') ?? ''
