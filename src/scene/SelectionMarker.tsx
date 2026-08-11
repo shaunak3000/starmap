@@ -1,23 +1,20 @@
 import { useEffect, useMemo } from 'react'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { FIELDS_PER_STAR } from '../lib/catalog-format.ts'
+import type { DetailTier } from '../lib/catalog-format.ts'
+import { epochPosition } from '../lib/epoch.ts'
 import { starLabel } from '../lib/catalog-loader.ts'
 import { useStarmap } from '../state/store.ts'
 
 /** Position a tier-0 star currently occupies, accounting for the collapse. */
 function renderedPosition(
-  attributes: Float32Array,
+  t0: DetailTier,
   index: number,
   dissolve: number,
   sphereRadiusPc: number,
+  years: number,
 ): THREE.Vector3 {
-  const base = index * FIELDS_PER_STAR
-  const position = new THREE.Vector3(
-    attributes[base],
-    attributes[base + 1],
-    attributes[base + 2],
-  )
+  const position = new THREE.Vector3(...epochPosition(t0, index, years))
   return position
     .clone()
     .normalize()
@@ -32,16 +29,17 @@ export function SelectionMarker() {
   const selection = useStarmap((state) => state.selection)
   const dissolve = useStarmap((state) => state.dissolve)
   const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
+  const years = useStarmap((state) => state.years)
 
   const hoverPosition = useMemo(() => {
     if (!catalog || hovered === null) return null
-    return renderedPosition(catalog.t0.attributes, hovered, dissolve, sphereRadiusPc)
-  }, [catalog, hovered, dissolve, sphereRadiusPc])
+    return renderedPosition(catalog.t0, hovered, dissolve, sphereRadiusPc, years)
+  }, [catalog, hovered, dissolve, sphereRadiusPc, years])
 
   const selectedPosition = useMemo(() => {
     if (!catalog || !selection) return null
-    return renderedPosition(catalog.t0.attributes, selection.index, dissolve, sphereRadiusPc)
-  }, [catalog, selection, dissolve, sphereRadiusPc])
+    return renderedPosition(catalog.t0, selection.index, dissolve, sphereRadiusPc, years)
+  }, [catalog, selection, dissolve, sphereRadiusPc, years])
 
   const selectedGeometry = useMemo(() => {
     if (!selectedPosition) return null

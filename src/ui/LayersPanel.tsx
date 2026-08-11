@@ -58,6 +58,11 @@ export function LayersPanel() {
             onChange={(value) => state.set('showGalaxy', value)}
           />
           <Toggle
+            label="HR diagram"
+            checked={state.showHrDiagram}
+            onChange={(value) => state.set('showHrDiagram', value)}
+          />
+          <Toggle
             label="Isolate selection"
             checked={state.isolate}
             onChange={(value) => state.set('isolate', value)}

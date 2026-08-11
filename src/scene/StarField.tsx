@@ -35,7 +35,11 @@ export function StarField({
   const gl = useThree((state) => state.gl)
 
   const geometry = useMemo(() => createStarGeometry(tier), [tier])
-  const material = useMemo(() => createStarMaterial(), [])
+  // Compiled per tier: the faint field has no velocity attribute to read.
+  const material = useMemo(
+    () => createStarMaterial({ hasVelocity: Boolean((tier as { velocities?: unknown }).velocities) }),
+    [tier],
+  )
 
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
@@ -44,6 +48,8 @@ export function StarField({
   const exposure = useStarmap((state) => state.exposure)
   const maxDistancePc = useStarmap((state) => state.maxDistancePc)
   const dissolve = useStarmap((state) => state.dissolve)
+  const years = useStarmap((state) => state.years)
+  const brush = useStarmap((state) => state.hrBrush)
   const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
 
   useEffect(() => {
@@ -54,6 +60,11 @@ export function StarField({
     uniforms.uMapScale.value = 1.5 * sizeScale * mapSizeScale
     uniforms.uIntensityScale.value = intensityScale
     uniforms.uDissolve.value = dissolve
+    uniforms.uYears.value = years
+    uniforms.uBrushStrength.value = brush ? 1 : 0
+    if (brush) {
+      uniforms.uBrush.value.set(brush.ciMin, brush.ciMax, brush.magMin, brush.magMax)
+    }
     uniforms.uSphereRadius.value = sphereRadiusPc
     // The far constellation anchors sit past 1000 pc, so the top of the slider
     // has to mean "no limit" rather than a hard cut that breaks their figures.
@@ -69,6 +80,8 @@ export function StarField({
     mapSizeScale,
     dissolve,
     sphereRadiusPc,
+    years,
+    brush,
   ])
 
   useEffect(() => {

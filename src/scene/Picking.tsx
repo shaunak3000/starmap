@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { FIELDS_PER_STAR } from '../lib/catalog-format.ts'
+import { epochPosition } from '../lib/epoch.ts'
 import { useStarmap } from '../state/store.ts'
 import { frameMatrix } from './frame.ts'
 
@@ -24,6 +24,7 @@ export function Picking() {
   const dissolve = useStarmap((state) => state.dissolve)
   const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
   const frame = useStarmap((state) => state.frame)
+  const years = useStarmap((state) => state.years)
 
   const dataToWorld = useMemo(() => frameMatrix(frame), [frame])
 
@@ -31,15 +32,14 @@ export function Picking() {
   const worldPositions = useMemo(() => {
     if (!catalog) return null
 
-    const { attributes, count } = catalog.t0
+    const { count } = catalog.t0
     const out = new Float32Array(count * 3)
     const vector = new THREE.Vector3()
+    const scratch: [number, number, number] = [0, 0, 0]
 
     for (let i = 0; i < count; i++) {
-      const base = i * FIELDS_PER_STAR
-      const x = attributes[base]
-      const y = attributes[base + 1]
-      const z = attributes[base + 2]
+      // Pick where the star is drawn at the current epoch, not where it is today.
+      const [x, y, z] = epochPosition(catalog.t0, i, years, scratch)
 
       const length = Math.hypot(x, y, z) || 1
       const shell = sphereRadiusPc / length
@@ -57,7 +57,7 @@ export function Picking() {
     }
 
     return out
-  }, [catalog, dissolve, sphereRadiusPc, dataToWorld])
+  }, [catalog, dissolve, sphereRadiusPc, dataToWorld, years])
 
   const pointer = useRef<{ x: number; y: number } | null>(null)
   const dragging = useRef(false)

@@ -1,3 +1,4 @@
+import { MAX_YEARS } from './proper-motion.ts'
 import type { CameraPose } from '../state/store.ts'
 
 /**
@@ -21,6 +22,7 @@ export interface UrlState {
   frame?: 'equatorial' | 'galactic'
   unit?: 'pc' | 'ly'
   dissolve?: number
+  years?: number
   layers?: {
     constellations?: boolean
     labels?: boolean
@@ -96,6 +98,7 @@ export function encodeUrlState(state: UrlState): string {
   if (state.frame) params.set('frm', state.frame === 'galactic' ? 'gal' : 'eq')
   if (state.unit) params.set('u', state.unit)
   if (state.dissolve !== undefined) params.set('dep', String(round(state.dissolve, 2)))
+  if (state.years !== undefined && state.years !== 0) params.set('yr', String(Math.round(state.years)))
 
   if (state.layers) {
     // Written as two lists so an absent key means "leave at the default",
@@ -146,6 +149,12 @@ export function decodeUrlState(hash: string): UrlState {
   if (dissolve !== null) {
     const value = Number(dissolve)
     if (Number.isFinite(value)) state.dissolve = Math.min(Math.max(value, 0), 1)
+  }
+
+  const years = params.get('yr')
+  if (years !== null) {
+    const value = Number(years)
+    if (Number.isFinite(value)) state.years = Math.min(Math.max(value, -MAX_YEARS), MAX_YEARS)
   }
 
   const on = params.get('on') ?? ''

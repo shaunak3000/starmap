@@ -1,6 +1,7 @@
 import { formatDistance as format } from './format.ts'
 import { constellationSpread } from '../lib/constellation-view.ts'
 import { describeVisibility } from '../lib/visibility.ts'
+import { describeYear } from '../lib/proper-motion.ts'
 import { useStarmap } from '../state/store.ts'
 
 export function Hud() {
@@ -14,6 +15,7 @@ export function Hud() {
   const showGrid = useStarmap((state) => state.showGrid)
   const gridStepPc = useStarmap((state) => state.gridStepPc)
   const viewerNorth = useStarmap((state) => state.viewerNorth)
+  const years = useStarmap((state) => state.years)
 
   if (!catalog) return null
 
@@ -35,6 +37,12 @@ export function Hud() {
           <>
             {' · '}
             <span className="hud-figure">{fps}</span> fps
+          </>
+        )}
+        {years !== 0 && (
+          <>
+            {' · '}
+            <span className="hud-figure">{describeYear(years)}</span>
           </>
         )}
         {showGrid && (

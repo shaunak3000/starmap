@@ -9,13 +9,22 @@ import { CELESTIAL_SPHERE_RADIUS_PC } from './StarField.tsx'
  * stay welded to their stars through the whole collapse.
  */
 const VERTEX_SHADER = /* glsl */ `
+  const float PC_PER_KM_S_YEAR = 1.0227121650537077e-6;
+
   uniform float uDissolve;
   uniform float uSphereRadius;
+  uniform float uYears;
+
+  attribute vec3 aVelocity;
 
   void main() {
+    // The same epoch maths the star shader runs, so a figure's sticks stay
+    // welded to its stars however far the clock is wound.
+    vec3 epochPosition = position + aVelocity * (uYears * PC_PER_KM_S_YEAR);
+
     vec3 renderPosition = mix(
-      normalize(position) * uSphereRadius,
-      position,
+      normalize(epochPosition) * uSphereRadius,
+      epochPosition,
       uDissolve
     );
     gl_Position = projectionMatrix * modelViewMatrix * vec4(renderPosition, 1.0);
@@ -49,6 +58,7 @@ function createLineMaterial(color: string, opacity: number): THREE.ShaderMateria
     fragmentShader: FRAGMENT_SHADER,
     uniforms: {
       uDissolve: { value: 1 },
+      uYears: { value: 0 },
       uSphereRadius: { value: CELESTIAL_SPHERE_RADIUS_PC },
       uColor: { value: new THREE.Color(color) },
       uOpacity: { value: opacity },
@@ -63,10 +73,19 @@ function createLineMaterial(color: string, opacity: number): THREE.ShaderMateria
 /** Expands polylines into gl_LINES pairs, reading true positions from tier 0. */
 function buildSegments(constellations: Constellation[], t0: DetailTier): THREE.BufferGeometry {
   const positions: number[] = []
+  const velocities: number[] = []
 
   const pushStar = (index: number) => {
     const base = index * FIELDS_PER_STAR
     positions.push(t0.attributes[base], t0.attributes[base + 1], t0.attributes[base + 2])
+
+    // Carried per vertex so scrubbing never rebuilds this geometry.
+    const v = index * 3
+    velocities.push(
+      t0.velocities?.[v] ?? 0,
+      t0.velocities?.[v + 1] ?? 0,
+      t0.velocities?.[v + 2] ?? 0,
+    )
   }
 
   for (const constellation of constellations) {
@@ -80,6 +99,7 @@ function buildSegments(constellations: Constellation[], t0: DetailTier): THREE.B
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('aVelocity', new THREE.Float32BufferAttribute(velocities, 3))
   return geometry
 }
 
@@ -88,6 +108,7 @@ export function ConstellationLines() {
   const show = useStarmap((state) => state.showConstellations)
   const dissolve = useStarmap((state) => state.dissolve)
   const sphereRadiusPc = useStarmap((state) => state.sphereRadiusPc)
+  const years = useStarmap((state) => state.years)
   const active = useStarmap((state) => state.activeConstellation)
   const isolate = useStarmap((state) => state.isolate)
 
@@ -115,11 +136,12 @@ export function ConstellationLines() {
     for (const material of [baseMaterial, activeMaterial]) {
       material.uniforms.uDissolve.value = dissolve
       material.uniforms.uSphereRadius.value = sphereRadiusPc
+      material.uniforms.uYears.value = years
     }
     // Selecting one figure pushes the rest back rather than hiding them, so the
     // chosen constellation reads against its context.
     baseMaterial.uniforms.uOpacity.value = active ? BASE_OPACITY_WHEN_ACTIVE : BASE_OPACITY
-  }, [baseMaterial, activeMaterial, dissolve, active, sphereRadiusPc])
+  }, [baseMaterial, activeMaterial, dissolve, active, sphereRadiusPc, years])
 
   if (!show || !all) return null
 

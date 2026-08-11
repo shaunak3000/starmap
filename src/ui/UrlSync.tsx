@@ -36,6 +36,7 @@ export function useInitialUrlState() {
     if (initial.frame) store.set('frame', initial.frame)
     if (initial.unit) store.set('unit', initial.unit)
     if (initial.dissolve !== undefined) store.set('dissolve', initial.dissolve)
+    if (initial.years !== undefined) store.set('years', initial.years)
 
     if (initial.layers) {
       const { layers } = initial
@@ -94,6 +95,7 @@ export function UrlSync() {
         ...(state.frame !== 'equatorial' ? { frame: state.frame } : {}),
         ...(state.unit !== 'ly' ? { unit: state.unit } : {}),
         ...(state.dissolve !== 1 ? { dissolve: state.dissolve } : {}),
+        ...(state.years !== 0 ? { years: state.years } : {}),
       }
 
       // Only layers that differ from their defaults, so the common link is short.

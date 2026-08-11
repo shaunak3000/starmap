@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene.tsx'
 import { useStarmap } from './state/store.ts'
+import { HrDiagram } from './ui/HrDiagram.tsx'
 import { Hud } from './ui/Hud.tsx'
 import { LabelLayer } from './ui/LabelLayer.tsx'
 import { LayersPanel } from './ui/LayersPanel.tsx'
@@ -40,6 +41,7 @@ function LoadState() {
 export default function App() {
   const init = useStarmap((state) => state.init)
   const ready = useStarmap((state) => state.catalog !== null)
+  const showHr = useStarmap((state) => state.showHrDiagram)
   const touring = useStarmap((state) => state.tourStep !== null)
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function App() {
           <LayersPanel />
           <SearchBox />
           <StarCard />
+          {showHr && <HrDiagram />}
           <Hud />
           <LabelLayer />
           <Tour />

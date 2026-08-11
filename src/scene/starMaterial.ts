@@ -7,6 +7,8 @@ import { FIELDS_PER_STAR, type CatalogTier } from '../lib/catalog-format.ts'
  */
 const COLOUR_GLSL = /* glsl */ `
   const float LOG10 = 0.4342944819032518;
+  /** Parsecs travelled per year per km/s of space velocity. */
+  const float PC_PER_KM_S_YEAR = 1.0227121650537077e-6;
 
   float bvToTemperature(float bv) {
     float c = clamp(bv, -0.4, 2.0);
@@ -59,9 +61,17 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float uDissolve;      // 0 = celestial sphere, 1 = true distances
   uniform float uSphereRadius;
   uniform float uIntensityScale;
+  uniform float uYears;
+  // Brush from the HR diagram: colour index min/max, absolute magnitude min/max.
+  uniform vec4  uBrush;
+  uniform float uBrushStrength;
 
   attribute float aAbsMag;
   attribute float aColorIndex;
+
+  #ifdef HAS_VELOCITY
+  attribute vec3 aVelocity;
+  #endif
 
   varying vec3  vColor;
   varying float vIntensity;
@@ -69,22 +79,29 @@ const VERTEX_SHADER = /* glsl */ `
   ${COLOUR_GLSL}
 
   void main() {
+    // Where the star is at the scrubbed epoch. Straight-line extrapolation is
+    // well inside the error the distances already carry over +/-100 kyr.
+    vec3 epochPosition = position;
+    #ifdef HAS_VELOCITY
+    epochPosition += aVelocity * (uYears * PC_PER_KM_S_YEAR);
+    #endif
+
     // Distance from the Sun is rotation-invariant, so this stays valid in any
     // reference frame the scene graph happens to be using.
-    float distanceFromSun = length(position);
+    float distanceFromSun = length(epochPosition);
 
     // Photometry always uses the true geometry, even while the rendered
     // positions are collapsed onto the sphere. Otherwise flattening the field
     // would relight the sky and the Earth view would stop matching reality.
-    vec4 truePosition = modelViewMatrix * vec4(position, 1.0);
+    vec4 truePosition = modelViewMatrix * vec4(epochPosition, 1.0);
     float distanceFromCamera = max(length(truePosition.xyz), 1e-4);
 
     // Collapsing every star onto a shell is the pre-Copernican sky: from the
     // Sun it is indistinguishable from the real thing, and from anywhere else
     // it falls apart. That contrast is the whole point of the app.
     vec3 renderPosition = mix(
-      normalize(position) * uSphereRadius,
-      position,
+      normalize(epochPosition) * uSphereRadius,
+      epochPosition,
       uDissolve
     );
     gl_Position = projectionMatrix * modelViewMatrix * vec4(renderPosition, 1.0);
@@ -130,6 +147,16 @@ const VERTEX_SHADER = /* glsl */ `
       size = 0.0;
     }
 
+    // Brushing the HR diagram dims everything outside the selection rather than
+    // hiding it, so the highlighted population reads against the whole sky it
+    // was drawn from.
+    if (uBrushStrength > 0.0) {
+      bool inside =
+        aColorIndex >= uBrush.x && aColorIndex <= uBrush.y &&
+        aAbsMag     >= uBrush.z && aAbsMag     <= uBrush.w;
+      if (!inside) intensity *= mix(1.0, 0.04, uBrushStrength);
+    }
+
     vIntensity = intensity;
     gl_PointSize = size * uPixelRatio;
   }
@@ -165,10 +192,17 @@ export interface StarMaterialOptions {
   /** Apparent magnitude that renders at `baseSize`. */
   refMag?: number
   mapScale?: number
+  /**
+   * Compile the proper-motion path. A define rather than a zero-filled
+   * attribute: the faint field has no velocities, and handing the GPU 28 MB of
+   * zeros to animate stars nobody can see move would be absurd.
+   */
+  hasVelocity?: boolean
 }
 
 export function createStarMaterial(options: StarMaterialOptions = {}): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
+    defines: options.hasVelocity ? { HAS_VELOCITY: '' } : {},
     vertexShader: VERTEX_SHADER,
     fragmentShader: FRAGMENT_SHADER,
     uniforms: {
@@ -186,6 +220,9 @@ export function createStarMaterial(options: StarMaterialOptions = {}): THREE.Sha
       uIntensityScale: { value: 1 },
       uDissolve: { value: 1 },
       uSphereRadius: { value: 120 },
+      uYears: { value: 0 },
+      uBrush: { value: new THREE.Vector4(-1, 3, -20, 25) },
+      uBrushStrength: { value: 0 },
       uFalloff: { value: 4.5 },
     },
     transparent: true,
@@ -213,10 +250,18 @@ export function createStarGeometry(tier: CatalogTier): THREE.BufferGeometry {
     geometry.setAttribute('position', new THREE.InterleavedBufferAttribute(interleaved, 3, 0))
     geometry.setAttribute('aAbsMag', new THREE.InterleavedBufferAttribute(interleaved, 1, 3))
     geometry.setAttribute('aColorIndex', new THREE.InterleavedBufferAttribute(interleaved, 1, 4))
+
+    if (tier.velocities) {
+      geometry.setAttribute('aVelocity', new THREE.BufferAttribute(tier.velocities, 3))
+    }
   } else {
     geometry.setAttribute('position', new THREE.Float16BufferAttribute(tier.positions, 3))
     geometry.setAttribute('aAbsMag', new THREE.Float16BufferAttribute(tier.absMag, 1))
     geometry.setAttribute('aColorIndex', new THREE.Float16BufferAttribute(tier.colorIndex, 1))
+
+    if (tier.velocities) {
+      geometry.setAttribute('aVelocity', new THREE.Float16BufferAttribute(tier.velocities, 3))
+    }
   }
 
   // The cloud always surrounds the camera, so an exact radius buys nothing;

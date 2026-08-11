@@ -49,6 +49,14 @@ export interface FocusRequest {
 /** Canonical viewing angles, relative to whichever frame is active. */
 export type ViewPreset = 'top' | 'edge'
 
+/** A rectangle brushed on the HR diagram, in catalogue units. */
+export interface HrBrush {
+  ciMin: number
+  ciMax: number
+  magMin: number
+  magMax: number
+}
+
 /**
  * Where the camera is and which way it faces, in the rig's own terms.
  *
@@ -100,6 +108,11 @@ interface StarmapState {
   isolate: boolean
   /** Current grid cell size in parsecs, published by AxisGrid. */
   gridStepPc: number
+  /** Epoch offset from today, in years. Drives proper motion. */
+  years: number
+  /** Active HR-diagram selection; null when nothing is brushed. */
+  hrBrush: HrBrush | null
+  showHrDiagram: boolean
   /** Star labels awaiting placement, published by the active figure. */
   labelCandidates: LabelCandidate[]
 
@@ -155,6 +168,8 @@ interface StarmapState {
   resetView: () => void
   /** Swaps which culture's figures are drawn over the same stars. */
   setSkyCulture: (cultureId: string) => Promise<void>
+  /** Sets or clears the HR-diagram selection. */
+  setHrBrush: (brush: HrBrush | null) => void
   startTour: () => void
   stopTour: () => void
   setTourStep: (step: number) => void
@@ -186,6 +201,9 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   showGalaxy: false,
   isolate: false,
   gridStepPc: 10,
+  years: 0,
+  hrBrush: null,
+  showHrDiagram: false,
   labelCandidates: [],
 
   selection: null,
@@ -287,6 +305,8 @@ export const useStarmap = create<StarmapState>((set, get) => ({
       cameraMode: pose.mode,
       poseRequest: { ...pose, token: (state.poseRequest?.token ?? 0) + 1 },
     })),
+
+  setHrBrush: (brush) => set({ hrBrush: brush }),
 
   startTour: () => set({ tourStep: 0 }),
 

@@ -1,3 +1,4 @@
+import { MAX_YEARS, describeYear } from '../lib/proper-motion.ts'
 import { DISTANCE_FILTER_MAX_PC } from '../scene/StarField.tsx'
 import {
   type CameraMode,
@@ -73,6 +74,47 @@ export function ViewPanel() {
           <p className="hint">
             The address bar tracks whatever you are looking at, so any view can
             be sent as a link.
+          </p>
+        </Section>
+
+        <Section title="Time">
+          <Slider
+            label="Epoch"
+            value={state.years}
+            min={-MAX_YEARS}
+            max={MAX_YEARS}
+            step={500}
+            display={describeYear(state.years)}
+            onChange={(value) => state.set('years', value)}
+          />
+          <div className="button-row">
+            <button
+              type="button"
+              className="button ghost"
+              onClick={() => state.set('years', 0)}
+              disabled={state.years === 0}
+            >
+              Now
+            </button>
+            <button
+              type="button"
+              className="button ghost"
+              onClick={() => state.set('years', -MAX_YEARS)}
+            >
+              −100k
+            </button>
+            <button
+              type="button"
+              className="button ghost"
+              onClick={() => state.set('years', MAX_YEARS)}
+            >
+              +100k
+            </button>
+          </div>
+          <p className="hint">
+            Every star carries its own velocity. Wind the clock and the figures
+            come apart — a constellation is an accident of <em>when</em> you look
+            as much as of where you stand.
           </p>
         </Section>
 

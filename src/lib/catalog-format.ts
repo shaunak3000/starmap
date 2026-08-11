@@ -31,8 +31,17 @@ import type { Visibility } from './visibility.ts'
  */
 
 export const CATALOG_MAGIC = 'SMAP'
-export const CATALOG_VERSION = 2
-export const HEADER_BYTES = 24
+export const CATALOG_VERSION = 3
+export const HEADER_BYTES = 32
+
+/**
+ * Velocity rides in its own parallel block rather than widening the interleaved
+ * record, so every existing `index * FIELDS_PER_STAR` read keeps working and a
+ * tier can carry it or not. t0 and t1 do; the faint field does not — an
+ * individual haze star cannot be seen moving, and carrying it would add 15 MB
+ * to the largest asset in the project for no visible gain.
+ */
+export const FLAG_HAS_VELOCITY = 1 << 0
 
 /** x, y, z (parsecs, equatorial), absolute magnitude, B-V colour index. */
 export const FIELDS_PER_STAR = 5
@@ -56,6 +65,8 @@ export interface DetailTier {
   count: number
   /** Interleaved x, y, z, absMag, colourIndex. */
   attributes: Float32Array
+  /** Space velocity in km/s, 3 per star. */
+  velocities?: Float32Array
 }
 
 /** Half-precision tier, GPU only. */
@@ -66,6 +77,12 @@ export interface FieldTier {
   positions: Uint16Array
   absMag: Uint16Array
   colorIndex: Uint16Array
+  /**
+   * Space velocity in km/s, 3 per star. Kept in km/s rather than pre-converted
+   * to parsecs per year: that conversion drops every value into half-float
+   * subnormals, where precision collapses.
+   */
+  velocities?: Uint16Array
 }
 
 export type CatalogTier = DetailTier | FieldTier
@@ -75,6 +92,7 @@ function writeHeader(
   count: number,
   elementType: number,
   layout: number,
+  flags: number,
 ): void {
   const view = new DataView(buffer)
   for (let i = 0; i < 4; i++) view.setUint8(i, CATALOG_MAGIC.charCodeAt(i))
@@ -83,26 +101,54 @@ function writeHeader(
   view.setUint32(12, FIELDS_PER_STAR, true)
   view.setUint32(16, elementType, true)
   view.setUint32(20, layout, true)
+  view.setUint32(24, flags, true)
+  view.setUint32(28, 0, true)
 }
 
-/** Packs interleaved Float32 attributes verbatim. */
-export function encodeDetailTier(attributes: Float32Array): ArrayBuffer {
+/** Packs interleaved Float32 attributes verbatim, with optional velocities. */
+export function encodeDetailTier(
+  attributes: Float32Array,
+  velocities?: Float32Array,
+): ArrayBuffer {
   const count = attributes.length / FIELDS_PER_STAR
   if (!Number.isInteger(count)) {
     throw new Error(`attribute length ${attributes.length} is not a multiple of ${FIELDS_PER_STAR}`)
   }
+  if (velocities && velocities.length !== count * 3) {
+    throw new Error(`velocity length ${velocities.length} does not match ${count} stars`)
+  }
 
-  const buffer = new ArrayBuffer(HEADER_BYTES + attributes.byteLength)
-  writeHeader(buffer, count, ELEMENT_FLOAT32, LAYOUT_INTERLEAVED)
+  const buffer = new ArrayBuffer(
+    HEADER_BYTES + attributes.byteLength + (velocities?.byteLength ?? 0),
+  )
+  writeHeader(
+    buffer,
+    count,
+    ELEMENT_FLOAT32,
+    LAYOUT_INTERLEAVED,
+    velocities ? FLAG_HAS_VELOCITY : 0,
+  )
+
   new Float32Array(buffer, HEADER_BYTES, attributes.length).set(attributes)
+  if (velocities) {
+    new Float32Array(buffer, HEADER_BYTES + attributes.byteLength, velocities.length).set(
+      velocities,
+    )
+  }
   return buffer
 }
 
 /** Splits interleaved Float32 attributes into planar half-float blocks. */
-export function encodeFieldTier(attributes: Float32Array): ArrayBuffer {
+export function encodeFieldTier(
+  attributes: Float32Array,
+  velocities?: Float32Array,
+): ArrayBuffer {
   const count = attributes.length / FIELDS_PER_STAR
   if (!Number.isInteger(count)) {
     throw new Error(`attribute length ${attributes.length} is not a multiple of ${FIELDS_PER_STAR}`)
+  }
+  if (velocities && velocities.length !== count * 3) {
+    throw new Error(`velocity length ${velocities.length} does not match ${count} stars`)
   }
 
   const positions = new Float32Array(count * 3)
@@ -118,21 +164,28 @@ export function encodeFieldTier(attributes: Float32Array): ArrayBuffer {
     colorIndex[i] = attributes[base + 4]
   }
 
-  const halfPositions = encodeHalfArray(positions)
-  const halfAbsMag = encodeHalfArray(absMag)
-  const halfColorIndex = encodeHalfArray(colorIndex)
+  const blocks = [
+    encodeHalfArray(positions),
+    encodeHalfArray(absMag),
+    encodeHalfArray(colorIndex),
+    ...(velocities ? [encodeHalfArray(velocities)] : []),
+  ]
 
-  const buffer = new ArrayBuffer(
-    HEADER_BYTES + halfPositions.byteLength + halfAbsMag.byteLength + halfColorIndex.byteLength,
+  const bytes = blocks.reduce((sum, block) => sum + block.byteLength, 0)
+  const buffer = new ArrayBuffer(HEADER_BYTES + bytes)
+  writeHeader(
+    buffer,
+    count,
+    ELEMENT_FLOAT16,
+    LAYOUT_PLANAR,
+    velocities ? FLAG_HAS_VELOCITY : 0,
   )
-  writeHeader(buffer, count, ELEMENT_FLOAT16, LAYOUT_PLANAR)
 
   let offset = HEADER_BYTES
-  new Uint16Array(buffer, offset, halfPositions.length).set(halfPositions)
-  offset += halfPositions.byteLength
-  new Uint16Array(buffer, offset, halfAbsMag.length).set(halfAbsMag)
-  offset += halfAbsMag.byteLength
-  new Uint16Array(buffer, offset, halfColorIndex.length).set(halfColorIndex)
+  for (const block of blocks) {
+    new Uint16Array(buffer, offset, block.length).set(block)
+    offset += block.byteLength
+  }
 
   return buffer
 }
@@ -165,10 +218,11 @@ export function decodeTier(buffer: ArrayBuffer): CatalogTier {
   }
 
   const elementType = view.getUint32(16, true)
+  const hasVelocity = (view.getUint32(24, true) & FLAG_HAS_VELOCITY) !== 0
 
   if (elementType === ELEMENT_FLOAT32) {
     const floats = count * FIELDS_PER_STAR
-    const expected = HEADER_BYTES + floats * 4
+    const expected = HEADER_BYTES + floats * 4 + (hasVelocity ? count * 3 * 4 : 0)
     if (buffer.byteLength !== expected) {
       throw new Error(`catalog tier size mismatch: ${buffer.byteLength} bytes, expected ${expected}`)
     }
@@ -176,11 +230,15 @@ export function decodeTier(buffer: ArrayBuffer): CatalogTier {
       kind: 'detail',
       count,
       attributes: new Float32Array(buffer, HEADER_BYTES, floats),
+      ...(hasVelocity
+        ? { velocities: new Float32Array(buffer, HEADER_BYTES + floats * 4, count * 3) }
+        : {}),
     }
   }
 
   if (elementType === ELEMENT_FLOAT16) {
-    const expected = HEADER_BYTES + count * 3 * 2 + count * 2 + count * 2
+    const expected =
+      HEADER_BYTES + count * 3 * 2 + count * 2 + count * 2 + (hasVelocity ? count * 3 * 2 : 0)
     if (buffer.byteLength !== expected) {
       throw new Error(`catalog tier size mismatch: ${buffer.byteLength} bytes, expected ${expected}`)
     }
@@ -191,8 +249,16 @@ export function decodeTier(buffer: ArrayBuffer): CatalogTier {
     const absMag = new Uint16Array(buffer, offset, count)
     offset += count * 2
     const colorIndex = new Uint16Array(buffer, offset, count)
+    offset += count * 2
 
-    return { kind: 'field', count, positions, absMag, colorIndex }
+    return {
+      kind: 'field',
+      count,
+      positions,
+      absMag,
+      colorIndex,
+      ...(hasVelocity ? { velocities: new Uint16Array(buffer, offset, count * 3) } : {}),
+    }
   }
 
   throw new Error(`catalog tier has unknown element type ${elementType}`)

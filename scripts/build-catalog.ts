@@ -28,6 +28,7 @@ import {
   encodeFieldTier,
 } from '../src/lib/catalog-format.ts'
 import { visibilityFor } from '../src/lib/visibility.ts'
+import { MAX_SPEED_KM_S, clampVelocity } from '../src/lib/proper-motion.ts'
 import { indexColumns, num, splitCsvRow, str } from './csv.ts'
 import { collectConstellationHips, parseStellariumSkyCulture, type RawConstellation } from './constellations.ts'
 import { GrowableFloat32 } from './growable.ts'
@@ -54,7 +55,7 @@ const DEFAULT_BV = 0.65
 
 const REQUIRED_COLUMNS = [
   'id', 'hip', 'hd', 'bayer', 'flam', 'con', 'proper',
-  'ra', 'dec', 'dist', 'x0', 'y0', 'z0', 'mag', 'absmag', 'ci', 'spect',
+  'ra', 'dec', 'dist', 'x0', 'y0', 'z0', 'mag', 'absmag', 'ci', 'spect', 'vx', 'vy', 'vz',
 ]
 
 interface Tier {
@@ -64,6 +65,8 @@ interface Tier {
   /** Full precision for the tier the CPU reads; half for the GPU-only bulk. */
   precision: 'detail' | 'field'
   attributes: GrowableFloat32
+  /** Space velocity in km/s. Omitted for the faint field, which never animates. */
+  velocities?: GrowableFloat32
   count: number
 }
 
@@ -72,6 +75,7 @@ function makeTier(
   file: string,
   magLimit: number | null,
   precision: 'detail' | 'field',
+  withVelocity = true,
 ): Tier {
   return {
     name,
@@ -79,6 +83,7 @@ function makeTier(
     magLimit,
     precision,
     attributes: new GrowableFloat32(1 << 16),
+    ...(withVelocity ? { velocities: new GrowableFloat32(1 << 16) } : {}),
     count: 0,
   }
 }
@@ -118,7 +123,9 @@ async function main() {
   const tiers = [
     makeTier('naked-eye + named', 't0.bin', T0_MAG_LIMIT, 'detail'),
     makeTier('to magnitude 9', 't1.bin', T1_MAG_LIMIT, 'field'),
-    makeTier('faint field', 't2.bin', null, 'field'),
+    // No velocities: an individual haze star cannot be seen moving, and
+    // carrying them would add 15 MB to the largest asset in the project.
+    makeTier('faint field', 't2.bin', null, 'field', false),
   ]
 
   const meta: StarMeta[] = []
@@ -134,6 +141,7 @@ async function main() {
     ciDefaulted: 0,
     beyondRangeKeptForConstellation: 0,
     maxPositionDeviationPc: 0,
+    velocityClamped: 0,
   }
 
   let columns: Record<string, number> | undefined
@@ -224,6 +232,15 @@ async function main() {
     const starIndex = tier.count
 
     tier.attributes.push(x, y, z, absMag, ci)
+    if (tier.velocities) {
+      const [vx, vy, vz] = clampVelocity(
+        num(fields[columns.vx]) ?? 0,
+        num(fields[columns.vy]) ?? 0,
+        num(fields[columns.vz]) ?? 0,
+      )
+      if (Math.hypot(vx, vy, vz) >= MAX_SPEED_KM_S) stats.velocityClamped++
+      tier.velocities.push(vx, vy, vz)
+    }
     tier.count++
     stats.kept++
 
@@ -264,8 +281,11 @@ async function main() {
 
   for (const tier of tiers) {
     const attributes = tier.attributes.toTypedArray()
+    const velocities = tier.velocities?.toTypedArray()
     const buffer =
-      tier.precision === 'detail' ? encodeDetailTier(attributes) : encodeFieldTier(attributes)
+      tier.precision === 'detail'
+        ? encodeDetailTier(attributes, velocities)
+        : encodeFieldTier(attributes, velocities)
     fs.writeFileSync(path.join(OUT_DIR, tier.file), Buffer.from(buffer))
   }
 
@@ -388,6 +408,7 @@ function report(
   console.log(`  colour:  ${stats.ciFromSpectralType.toLocaleString()} inferred from spectral type, ${stats.ciDefaulted.toLocaleString()} defaulted to B-V ${DEFAULT_BV}`)
   console.log(`  kept beyond ${MAX_DISTANCE_PC} pc because they anchor a constellation: ${stats.beyondRangeKeptForConstellation}`)
   console.log(`  max deviation from catalogue x0/y0/z0: ${stats.maxPositionDeviationPc.toExponential(2)} pc`)
+  console.log(`  velocities clamped to ${MAX_SPEED_KM_S} km/s: ${stats.velocityClamped} (bad radial velocities, not real stars)`)
 
   console.log('\nTiers:')
   for (const tier of tiers) {

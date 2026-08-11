@@ -62,8 +62,14 @@ the hash it wrote, so none of them is a link nobody has opened.
   as you zoom, and an isolate mode that strips the view to one figure.
 - **Star inspection**: click any naked-eye or named star for distance,
   magnitudes, temperature and spectral class.
-- **Shareable views** — the address bar tracks culture, figure, camera, layers
-  and frame, so any view can be sent as a link and survives a refresh.
+- **A time scrubber**, ±100,000 years. Every star carries its own space
+  velocity, so winding the clock pulls the figures apart — a constellation is an
+  accident of *when* you look as much as of where you stand.
+- **A brushable HR diagram.** Drag a box around the giant branch or the main
+  sequence and everything outside it dims in the sky, so a population picked out
+  by physics can be seen in space.
+- **Shareable views** — the address bar tracks culture, figure, camera, layers,
+  frame and epoch, so any view can be sent as a link and survives a refresh.
 
 ### The same stars, other people's sky
 
@@ -74,6 +80,15 @@ draws a hunter, the Chinese set draws hundreds of small asterisms; the Indian
 nakshatras divide the sky along the Moon's monthly path instead. Names are shown
 in their own script with romanisation, and each figure carries the month it is
 best seen and which hemisphere can see it.
+
+### Selecting a population by physics
+
+![The HR diagram with the giant branch brushed](docs/images/hr-diagram.png)
+
+Colour index across, absolute magnitude up. The main sequence and the giant
+branch separate on their own — nothing here is drawn, it is 120,000 real stars
+plotted by two of their own measurements. Brushing the giants leaves only the
+evolved stars lit, and the sky turns gold.
 
 ### Where we actually are
 
@@ -153,9 +168,14 @@ magnitude so the app can show something immediately and stream the rest:
 
 | tier | stars | precision | size | contents |
 | --- | --- | --- | --- | --- |
-| `t0.bin` | 8,351 | float32 | 0.16 MB | naked-eye and named, with metadata |
-| `t1.bin` | 111,640 | float16 | 1.1 MB | down to magnitude 9 |
+| `t0.bin` | 8,351 | float32 | 0.27 MB | naked-eye and named, with metadata |
+| `t1.bin` | 111,640 | float16 | 1.7 MB | down to magnitude 9 |
 | `t2.bin` | 2,378,330 | float16 | 22.7 MB | the faint field, loaded on demand |
+
+t0 and t1 also carry a space velocity per star, in a parallel block so the
+interleaved record never widened. The faint field deliberately does not: an
+individual haze star cannot be seen moving, and carrying it would have added
+15 MB to the largest asset in the project.
 
 Only `t0` is read by the CPU — picking, constellation geometry, search and the
 star card all index into it, and it holds the stars you fly to and quote
