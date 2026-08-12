@@ -53,8 +53,15 @@ async function main() {
 
   await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 })
   await page.waitForSelector('canvas')
-  await page.evaluate(`window.__starmap.getState().stopTour()`)
-  await settle(900)
+  // The store handle is dev-only. Against production, dismiss the intro the way
+  // a visitor would instead.
+  const hasStore = (await page.evaluate(`typeof window.__starmap`)) === 'function'
+  if (hasStore) {
+    await page.evaluate(`window.__starmap.getState().stopTour()`)
+  } else {
+    await page.keyboard.press('Escape')
+  }
+  await settle(1200)
 
   // Park the pointer in the middle so neither edge is being asked for.
   await page.mouse.move(640, 400)
@@ -111,14 +118,19 @@ async function main() {
     check('a drag off the panel does not close it', false, 'no slider found')
   }
 
-  // Turning the preference off pins them open.
-  await page.evaluate(`window.__starmap.getState().set('autoHidePanels', false)`)
-  await page.mouse.move(640, 400)
-  await settle()
-  check(
-    'switching auto-hide off pins both open',
-    (await visible('left')) > 100 && (await visible('right')) > 100,
-  )
+  // Turning the preference off pins them open. Needs the store, so it only
+  // runs where the dev handle exists.
+  if (hasStore) {
+    await page.evaluate(`window.__starmap.getState().set('autoHidePanels', false)`)
+    await page.mouse.move(640, 400)
+    await settle()
+    check(
+      'switching auto-hide off pins both open',
+      (await visible('left')) > 100 && (await visible('right')) > 100,
+    )
+  } else {
+    console.log('SKIP  switching auto-hide off pins both open — needs the dev store handle')
+  }
 
   await browser.close()
 
