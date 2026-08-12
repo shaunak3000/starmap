@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useStarmap } from '../state/store.ts'
+import { persistAutoHide, useStarmap } from '../state/store.ts'
 import { Section, Toggle } from './controls.tsx'
 import { describeVisibility } from '../lib/visibility.ts'
 import { formatDistance } from './format.ts'
@@ -12,7 +12,13 @@ const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct',
  * list is the one thing here that genuinely cannot fit on screen at 88 entries,
  * so it gets its own scroll region and the rest stays fixed around it.
  */
-export function LayersPanel() {
+export function LayersPanel({
+  ref,
+  open = true,
+}: {
+  ref?: React.Ref<HTMLElement>
+  open?: boolean
+}) {
   const state = useStarmap()
   const [filter, setFilter] = useState('')
 
@@ -34,7 +40,7 @@ export function LayersPanel() {
   const activeCulture = cultures.find((c) => c.id === state.skyCulture)
 
   return (
-    <aside className="panel-right panel">
+    <aside ref={ref} className={`panel-right panel${open ? '' : ' is-hidden'}`}>
       <div className="panel-fixed">
         <Section title="Layers">
           <Toggle
@@ -56,6 +62,14 @@ export function LayersPanel() {
             label="Milky Way (model)"
             checked={state.showGalaxy}
             onChange={(value) => state.set('showGalaxy', value)}
+          />
+          <Toggle
+            label="Auto-hide panels"
+            checked={state.autoHidePanels}
+            onChange={(value) => {
+              state.set('autoHidePanels', value)
+              persistAutoHide(value)
+            }}
           />
           <Toggle
             label="HR diagram"

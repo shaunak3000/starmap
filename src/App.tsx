@@ -12,6 +12,7 @@ import { StarCard } from './ui/StarCard.tsx'
 import { Tour } from './ui/Tour.tsx'
 import { UrlSync } from './ui/UrlSync.tsx'
 import { ViewPanel } from './ui/ViewPanel.tsx'
+import { useEdgeReveal } from './ui/useEdgeReveal.ts'
 
 function LoadState() {
   const loading = useStarmap((state) => state.loading)
@@ -42,7 +43,12 @@ export default function App() {
   const init = useStarmap((state) => state.init)
   const ready = useStarmap((state) => state.catalog !== null)
   const showHr = useStarmap((state) => state.showHrDiagram)
+  const autoHide = useStarmap((state) => state.autoHidePanels)
   const touring = useStarmap((state) => state.tourStep !== null)
+
+  // The tour fades the panels itself, so edge reveal stays out of its way.
+  const left = useEdgeReveal<HTMLElement>('left', autoHide && !touring)
+  const right = useEdgeReveal<HTMLElement>('right', autoHide && !touring)
 
   useEffect(() => {
     void init()
@@ -57,7 +63,18 @@ export default function App() {
   }, [])
 
   return (
-    <div className={`app-root${touring ? ' tour-playing' : ''}`}>
+    <div
+      className={[
+        'app-root',
+        touring ? 'tour-playing' : '',
+        // Drive the chrome that sits between the columns, so the HUD, star card
+        // and HR panel reclaim the space a hidden panel leaves behind.
+        left.open ? '' : 'left-hidden',
+        right.open ? '' : 'right-hidden',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <Canvas
         camera={{ fov: 60, near: 0.01, far: 120000, position: [0, 0, 60] }}
         gl={{
@@ -79,8 +96,17 @@ export default function App() {
 
       {ready && (
         <>
-          <ViewPanel />
-          <LayersPanel />
+          <ViewPanel ref={left.ref} open={left.open} />
+          <LayersPanel ref={right.ref} open={right.open} />
+
+          {/* Always-visible handles: a panel that has slid away needs to leave
+              some sign that it exists, or the controls simply vanish. */}
+          {autoHide && (
+            <>
+              <div className={`edge-handle edge-handle-left${left.open ? ' is-open' : ''}`} aria-hidden />
+              <div className={`edge-handle edge-handle-right${right.open ? ' is-open' : ''}`} aria-hidden />
+            </>
+          )}
           <SearchBox />
           <StarCard />
           {showHr && <HrDiagram />}

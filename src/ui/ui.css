@@ -45,6 +45,65 @@
   overflow: hidden;
 }
 
+/*
+ * Auto-hide. The panels are chrome and the sky is the subject, so once a view
+ * is set up they slide out of the way; reaching for the edge brings them back.
+ * Translated rather than unmounted so the slide can animate and so focus and
+ * scroll positions survive.
+ */
+.panel-left.is-hidden,
+.panel-right.is-hidden {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.panel-left.is-hidden {
+  transform: translateX(calc(-100% - 1.5rem));
+}
+
+.panel-right.is-hidden {
+  transform: translateX(calc(100% + 1.5rem));
+}
+
+.panel-left,
+.panel-right {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+}
+
+/*
+ * The handle is the only clue a hidden panel leaves behind. It thickens and
+ * brightens as the panel comes out, so the gesture reads as pulling it open.
+ */
+.edge-handle {
+  position: fixed;
+  top: 50%;
+  width: 3px;
+  height: 5rem;
+  margin-top: -2.5rem;
+  border-radius: 3px;
+  background: rgba(124, 198, 255, 0.35);
+  box-shadow: 0 0 12px rgba(124, 198, 255, 0.25);
+  pointer-events: none;
+  z-index: 95;
+  transition: opacity 200ms ease, width 200ms ease, background 200ms ease;
+}
+
+.edge-handle-left {
+  left: 0;
+}
+
+.edge-handle-right {
+  right: 0;
+}
+
+.edge-handle.is-open {
+  opacity: 0;
+}
+
+.tour-playing .edge-handle {
+  opacity: 0;
+}
+
 .panel-scroll {
   /* A fallback for very short viewports; at laptop height nothing scrolls. */
   overflow-y: auto;
@@ -787,6 +846,34 @@
 
 .credit a {
   color: inherit;
+}
+
+/*
+ * Chrome that lives between the two columns reclaims the space a hidden panel
+ * leaves, rather than sitting in a gap that is no longer there.
+ */
+.left-hidden .hud,
+.left-hidden .star-card {
+  left: 1rem;
+}
+
+.right-hidden .hud {
+  right: 1rem;
+}
+
+.right-hidden .hr-panel {
+  right: 1rem;
+}
+
+.left-hidden.right-hidden .search {
+  width: min(24rem, calc(100vw - 6rem));
+}
+
+.hud,
+.star-card,
+.hr-panel {
+  transition: left 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    right 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (max-width: 1180px) {

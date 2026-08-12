@@ -77,6 +77,30 @@ export interface CameraPose {
 /** Shell radius used when no figure is driving it. */
 export const DEFAULT_SPHERE_RADIUS_PC = 120
 
+const AUTO_HIDE_KEY = 'starmap.autoHidePanels'
+
+/**
+ * Panels auto-hide by default: the sky is the point, and the edge handles make
+ * the behaviour discoverable. It is a preference rather than part of a view, so
+ * it lives in localStorage and stays out of shared links.
+ */
+function readAutoHide(): boolean {
+  try {
+    const stored = window.localStorage.getItem(AUTO_HIDE_KEY)
+    return stored === null ? true : stored === '1'
+  } catch {
+    return true
+  }
+}
+
+export function persistAutoHide(value: boolean): void {
+  try {
+    window.localStorage.setItem(AUTO_HIDE_KEY, value ? '1' : '0')
+  } catch {
+    // Private browsing can refuse storage; the session default still applies.
+  }
+}
+
 interface StarmapState {
   catalog: LoadedCatalog | null
   loading: boolean
@@ -113,6 +137,8 @@ interface StarmapState {
   /** Active HR-diagram selection; null when nothing is brushed. */
   hrBrush: HrBrush | null
   showHrDiagram: boolean
+  /** Slide the side panels away until the pointer reaches for them. */
+  autoHidePanels: boolean
   /** Star labels awaiting placement, published by the active figure. */
   labelCandidates: LabelCandidate[]
 
@@ -204,6 +230,7 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   years: 0,
   hrBrush: null,
   showHrDiagram: false,
+  autoHidePanels: readAutoHide(),
   labelCandidates: [],
 
   selection: null,

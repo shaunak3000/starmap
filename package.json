@@ -16,7 +16,8 @@
     "check:camera": "tsx scripts/check-camera.ts",
     "shoot": "tsx scripts/shoot.ts",
     "check:links": "tsx scripts/check-links.ts",
-    "make:links": "tsx scripts/make-links.ts"
+    "make:links": "tsx scripts/make-links.ts",
+    "check:panels": "tsx scripts/check-panels.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
