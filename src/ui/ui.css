@@ -46,10 +46,8 @@
 }
 
 /*
- * Auto-hide. The panels are chrome and the sky is the subject, so once a view
- * is set up they slide out of the way; reaching for the edge brings them back.
- * Translated rather than unmounted so the slide can animate and so focus and
- * scroll positions survive.
+ * Hidden by the top-bar switch. Translated rather than unmounted so the slide
+ * can animate and so focus and scroll positions survive.
  */
 .panel-left.is-hidden,
 .panel-right.is-hidden {
@@ -71,37 +69,62 @@
 }
 
 /*
- * The handle is the only clue a hidden panel leaves behind. It thickens and
- * brightens as the panel comes out, so the gesture reads as pulling it open.
+ * The handle is the clue a hidden panel leaves behind, and the second way back.
+ * The button is a 2.75rem touch target — a finger has no hover and cannot aim at
+ * a hairline — while the visible mark stays a thin sliver so it does not become
+ * chrome in its own right.
  */
 .edge-handle {
   position: fixed;
   top: 50%;
-  width: 3px;
-  height: 5rem;
-  margin-top: -2.5rem;
-  border-radius: 3px;
-  background: rgba(124, 198, 255, 0.35);
-  box-shadow: 0 0 12px rgba(124, 198, 255, 0.25);
-  pointer-events: none;
+  width: 2.75rem;
+  height: 5.5rem;
+  margin-top: -2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
   z-index: 95;
-  transition: opacity 200ms ease, width 200ms ease, background 200ms ease;
+  display: flex;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 200ms ease;
+}
+
+.edge-handle::before {
+  content: '';
+  width: 3px;
+  height: 100%;
+  border-radius: 3px;
+  background: rgba(124, 198, 255, 0.4);
+  box-shadow: 0 0 12px rgba(124, 198, 255, 0.25);
+  transition: width 160ms ease, background 160ms ease;
+}
+
+.edge-handle:hover::before,
+.edge-handle:focus-visible::before,
+.edge-handle:active::before {
+  width: 7px;
+  background: rgba(124, 198, 255, 0.8);
+}
+
+.edge-handle:focus-visible {
+  outline: none;
 }
 
 .edge-handle-left {
   left: 0;
+  justify-content: flex-start;
 }
 
 .edge-handle-right {
   right: 0;
-}
-
-.edge-handle.is-open {
-  opacity: 0;
+  justify-content: flex-end;
 }
 
 .tour-playing .edge-handle {
   opacity: 0;
+  pointer-events: none;
 }
 
 .panel-scroll {
@@ -457,16 +480,85 @@
   color: var(--accent);
 }
 
-/* ------------------------------------------------------------------- search */
+/* ------------------------------------------------------- top bar and search */
 
-.search {
+/* Sits in the gap between the two columns, and stays put when they leave — the
+   switch that hides the panels cannot live inside one. */
+.top-bar {
   position: fixed;
   top: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  /* Sits in the gap between the two panels. */
-  width: min(24rem, calc(100vw - 36rem));
+  width: min(30rem, calc(100vw - 36rem));
   z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.search {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sidebar-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--panel-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.sidebar-toggle:hover {
+  color: var(--fg);
+}
+
+.sidebar-toggle.is-on {
+  color: var(--accent);
+  border-color: rgba(124, 198, 255, 0.45);
+}
+
+/* Matched to the panel toggles, so the same gesture looks the same everywhere. */
+.switch-track {
+  width: 1.9rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  position: relative;
+  flex: none;
+  transition: background 140ms ease;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: #cfd8e8;
+  transition: transform 140ms ease;
+}
+
+.sidebar-toggle.is-on .switch-track {
+  background: rgba(124, 198, 255, 0.55);
+}
+
+.sidebar-toggle.is-on .switch-knob {
+  transform: translateX(0.85rem);
 }
 
 .search-input {
@@ -487,7 +579,13 @@
   border-color: rgba(124, 198, 255, 0.45);
 }
 
+/* Hangs below the input rather than sitting in flow: in the top bar's flex row
+   it would otherwise push the switch's alignment around as results arrive. */
 .search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
   margin-top: 0.35rem;
   padding: 0.25rem;
   display: flex;
@@ -794,7 +892,7 @@
 /* The panels are noise during the tour; they fade back in when it ends. */
 .tour-playing .panel-left,
 .tour-playing .panel-right,
-.tour-playing .search,
+.tour-playing .top-bar,
 .tour-playing .star-card {
   opacity: 0.12;
   pointer-events: none;
@@ -803,7 +901,7 @@
 
 .panel-left,
 .panel-right,
-.search,
+.top-bar,
 .star-card {
   transition: opacity 500ms ease;
 }
@@ -852,21 +950,18 @@
  * Chrome that lives between the two columns reclaims the space a hidden panel
  * leaves, rather than sitting in a gap that is no longer there.
  */
-.left-hidden .hud,
-.left-hidden .star-card {
+.sidebars-hidden .hud,
+.sidebars-hidden .star-card {
   left: 1rem;
 }
 
-.right-hidden .hud {
+.sidebars-hidden .hud,
+.sidebars-hidden .hr-panel {
   right: 1rem;
 }
 
-.right-hidden .hr-panel {
-  right: 1rem;
-}
-
-.left-hidden.right-hidden .search {
-  width: min(24rem, calc(100vw - 6rem));
+.sidebars-hidden .top-bar {
+  width: min(30rem, calc(100vw - 8rem));
 }
 
 .hud,
@@ -881,8 +976,8 @@
   .panel-right {
     width: 13.5rem;
   }
-  .search {
-    width: min(18rem, calc(100vw - 31rem));
+  .top-bar {
+    width: min(24rem, calc(100vw - 30rem));
   }
   .star-card {
     left: 15.5rem;
@@ -900,12 +995,35 @@
   .panel-right {
     display: none;
   }
-  .search {
-    width: min(18rem, calc(100vw - 17rem));
+  /* No right panel to reveal, so a handle there would promise nothing. */
+  .edge-handle-right {
+    display: none;
+  }
+  /* Only the left column exists here, so the bar anchors right of it rather
+     than centring into it — the switch has to stay reachable, and a centred bar
+     this narrow lands on top of the panel. */
+  .top-bar {
+    left: auto;
+    right: 1rem;
+    transform: none;
+    width: min(20rem, calc(100vw - 16.5rem));
+  }
+  .sidebars-hidden .top-bar {
+    left: 1rem;
+    width: auto;
+  }
+  /* The label is the first thing to go when the row runs out of room; the
+     switch itself still reads as a switch. */
+  .sidebar-toggle-label {
+    display: none;
   }
   .star-card,
   .hud {
     left: 15.5rem;
     right: 1rem;
+  }
+  .sidebars-hidden .star-card,
+  .sidebars-hidden .hud {
+    left: 1rem;
   }
 }

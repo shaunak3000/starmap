@@ -1,11 +1,11 @@
 /**
- * Drives real pointer movement to check the panels hide and reveal.
+ * Drives real pointer and touch input to check the sidebar switch.
  *
  *   npx tsx scripts/check-panels.ts [url]
  *
- * Screenshots cannot show hover behaviour, and the failure modes here are all
- * about timing and geometry: a panel that never comes back, one that never goes
- * away, or one that snatches itself away mid-drag.
+ * Screenshots cannot show any of this: what matters is that the panels stay put
+ * unless asked to go, that a finger can bring them back with no pointer to hover
+ * with, and that the choice survives a reload.
  */
 
 import { chromium } from 'playwright'
@@ -32,11 +32,18 @@ function onScreenExpression(side: 'left' | 'right'): string {
   })()`
 }
 
+/** Left edge of the HUD, which should reclaim the space a hidden panel leaves. */
+const HUD_LEFT = `(() => {
+  const el = document.querySelector('.hud')
+  return el ? Math.round(el.getBoundingClientRect().left) : -1
+})()`
+
 async function main() {
   const browser = await chromium.launch({
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   })
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+  // hasTouch so the handle can be tapped the way a phone would tap it.
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, hasTouch: true })
 
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.message}`))
@@ -49,88 +56,137 @@ async function main() {
   const visible = async (side: 'left' | 'right') =>
     (await page.evaluate(onScreenExpression(side))) as number
 
-  const settle = (ms = 700) => page.waitForTimeout(ms)
+  const settle = (ms = 600) => page.waitForTimeout(ms)
 
-  await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 })
-  await page.waitForSelector('canvas')
-  // The store handle is dev-only. Against production, dismiss the intro the way
-  // a visitor would instead.
-  const hasStore = (await page.evaluate(`typeof window.__starmap`)) === 'function'
-  if (hasStore) {
-    await page.evaluate(`window.__starmap.getState().stopTour()`)
-  } else {
-    await page.keyboard.press('Escape')
+  /**
+   * Polls until a measurement satisfies the predicate.
+   *
+   * CSS transitions only advance on a rendered frame, and under software WebGL
+   * this page renders them slowly — a fixed sleep measures whatever the
+   * transition happened to reach, which is a property of this machine rather
+   * than of the app.
+   */
+  const settles = async (read: () => Promise<number>, ok: (value: number) => boolean) => {
+    const deadline = Date.now() + 5000
+    let value = await read()
+    while (!ok(value) && Date.now() < deadline) {
+      await page.waitForTimeout(100)
+      value = await read()
+    }
+    return value
   }
-  await settle(1200)
 
-  // Park the pointer in the middle so neither edge is being asked for.
+  const load = async () => {
+    await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 })
+    await page.waitForSelector('canvas')
+    // The store handle is dev-only. Against production, dismiss the intro the
+    // way a visitor would instead.
+    const hasStore = (await page.evaluate(`typeof window.__starmap`)) === 'function'
+    if (hasStore) await page.evaluate(`window.__starmap.getState().stopTour()`)
+    else await page.keyboard.press('Escape')
+    await settle(1200)
+  }
+
+  await load()
+
+  check(
+    'both panels start visible',
+    (await visible('left')) > 100 && (await visible('right')) > 100,
+    `left ${await visible('left')}px, right ${await visible('right')}px`,
+  )
+
+  const hudDocked = (await page.evaluate(HUD_LEFT)) as number
+
+  // Nothing about moving the pointer should move the chrome.
+  await page.mouse.move(2, 400)
+  await settle()
+  check('reaching for the edge changes nothing', (await visible('left')) > 100)
   await page.mouse.move(640, 400)
   await settle()
 
-  check('both panels start hidden', (await visible('left')) <= 0 && (await visible('right')) <= 0,
-    `left ${await visible('left')}px, right ${await visible('right')}px`)
+  const toggle = page.locator('.sidebar-toggle')
+  check('the switch sits in the top bar', await toggle.isVisible())
+  check('it reads as a switch', (await toggle.getAttribute('aria-checked')) === 'false')
 
-  check('an edge handle marks where they went', await page.locator('.edge-handle-left').isVisible())
+  await toggle.click()
+  const leftGone = await settles(() => visible('left'), (v) => v <= 0)
+  const rightGone = await settles(() => visible('right'), (v) => v <= 0)
+  check(
+    'the switch clears both panels',
+    leftGone <= 0 && rightGone <= 0,
+    `left ${leftGone}px, right ${rightGone}px`,
+  )
+  check('the switch shows its state', (await toggle.getAttribute('aria-checked')) === 'true')
+  check('the switch itself stays reachable', await toggle.isVisible())
+  check(
+    'both edges show a handle',
+    (await page.locator('.edge-handle-left').isVisible()) &&
+      (await page.locator('.edge-handle-right').isVisible()),
+  )
 
-  // Reach for the left edge.
-  await page.mouse.move(4, 400)
-  await settle()
-  const leftOut = await visible('left')
-  check('the left panel returns at the edge', leftOut > 100, `${leftOut}px on screen`)
-  check('the right panel stays away', (await visible('right')) <= 0)
+  const hudCleared = await settles(
+    () => page.evaluate(HUD_LEFT) as Promise<number>,
+    (v) => v < hudDocked - 100,
+  )
+  check(
+    'the HUD reclaims the space',
+    hudCleared < hudDocked - 100,
+    `${hudDocked}px docked, ${hudCleared}px cleared`,
+  )
 
-  // Moving onto the panel itself must keep it out.
-  await page.mouse.move(120, 300)
-  await settle()
-  check('it stays out while the pointer is on it', (await visible('left')) > 100)
-
-  // And away again.
-  await page.mouse.move(640, 400)
+  // They must stay gone: no pointer movement brings them back on its own.
+  await page.mouse.move(2, 400)
   await settle(900)
-  check('it slides away once the pointer leaves', (await visible('left')) <= 0)
-
-  // The right edge is independent.
-  await page.mouse.move(1276, 400)
-  await settle()
-  check('the right panel returns at its own edge', (await visible('right')) > 100)
-  check('the left panel is unaffected', (await visible('left')) <= 0)
-
+  check('hovering the edge does not bring them back', (await visible('left')) <= 0)
   await page.mouse.move(640, 400)
-  await settle(900)
+
+  // A finger has no hover, so the handle has to be a real target.
+  const handle = page.locator('.edge-handle-left')
+  const box = await handle.boundingBox()
+  check('the handle is a finger-sized target', (box?.width ?? 0) >= 40, `${box?.width ?? 0}px wide`)
+  if (box) {
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    const back = await settles(() => visible('left'), (v) => v > 100)
+    check('tapping the handle brings them back', back > 100, `${back}px on screen`)
+  } else {
+    check('tapping the handle brings them back', false, 'no handle found')
+  }
+
+  // The choice is a preference, so it outlives the page.
+  await toggle.click()
+  await settle()
+  await load()
+  check('the choice survives a reload', (await visible('left')) <= 0)
+  check(
+    'the handle is there to undo it',
+    await page.locator('.edge-handle-left').isVisible(),
+  )
 
   /*
-   * A slider drag that strays off the panel must not snatch it away: pointer
-   * capture keeps events targeted at the control, which the reveal treats as
-   * still being inside.
+   * Phone width. The right column is gone here, so its handle would promise
+   * something that cannot appear, and the top bar has to clear the one column
+   * that remains instead of centring on top of it.
    */
-  await page.mouse.move(4, 400)
-  await settle()
-  const slider = page.locator('.panel-left input[type="range"]').first()
-  const box = await slider.boundingBox()
-  if (box) {
-    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(700, box.y + box.height / 2, { steps: 10 })
-    await settle(600)
-    check('a drag off the panel does not close it', (await visible('left')) > 100)
-    await page.mouse.up()
-  } else {
-    check('a drag off the panel does not close it', false, 'no slider found')
-  }
+  await page.setViewportSize({ width: 390, height: 844 })
+  await settle(900)
+  await page.locator('.edge-handle-left').tap()
+  await settles(() => visible('left'), (v) => v > 100)
 
-  // Turning the preference off pins them open. Needs the store, so it only
-  // runs where the dev handle exists.
-  if (hasStore) {
-    await page.evaluate(`window.__starmap.getState().set('autoHidePanels', false)`)
-    await page.mouse.move(640, 400)
-    await settle()
-    check(
-      'switching auto-hide off pins both open',
-      (await visible('left')) > 100 && (await visible('right')) > 100,
-    )
-  } else {
-    console.log('SKIP  switching auto-hide off pins both open — needs the dev store handle')
-  }
+  const overlap = (await page.evaluate(`(() => {
+    const bar = document.querySelector('.top-bar').getBoundingClientRect()
+    const panel = document.querySelector('.panel-left').getBoundingClientRect()
+    return Math.round(panel.right - bar.left)
+  })()`)) as number
+  check('on a phone the top bar clears the panel', overlap <= 0, `${overlap}px of overlap`)
+  check('the switch is still reachable', await page.locator('.sidebar-toggle').isVisible())
+
+  await page.locator('.sidebar-toggle').tap()
+  await settles(() => visible('left'), (v) => v <= 0)
+  check('tapping it clears the panel', (await visible('left')) <= 0)
+  check(
+    'no handle for the column a phone does not have',
+    !(await page.locator('.edge-handle-right').isVisible()),
+  )
 
   await browser.close()
 
@@ -138,7 +194,7 @@ async function main() {
     console.log(`\n${failures.length} failure(s)`)
     process.exit(1)
   }
-  console.log('\npanel reveal OK')
+  console.log('\nsidebar switch OK')
 }
 
 main().catch((error) => {

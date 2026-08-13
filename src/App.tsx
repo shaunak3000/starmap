@@ -8,11 +8,11 @@ import { Hud } from './ui/Hud.tsx'
 import { LabelLayer } from './ui/LabelLayer.tsx'
 import { LayersPanel } from './ui/LayersPanel.tsx'
 import { SearchBox } from './ui/SearchBox.tsx'
+import { SidebarToggle } from './ui/SidebarToggle.tsx'
 import { StarCard } from './ui/StarCard.tsx'
 import { Tour } from './ui/Tour.tsx'
 import { UrlSync } from './ui/UrlSync.tsx'
 import { ViewPanel } from './ui/ViewPanel.tsx'
-import { useEdgeReveal } from './ui/useEdgeReveal.ts'
 
 function LoadState() {
   const loading = useStarmap((state) => state.loading)
@@ -43,12 +43,9 @@ export default function App() {
   const init = useStarmap((state) => state.init)
   const ready = useStarmap((state) => state.catalog !== null)
   const showHr = useStarmap((state) => state.showHrDiagram)
-  const autoHide = useStarmap((state) => state.autoHidePanels)
+  const hidden = useStarmap((state) => state.hideSidebars)
+  const setHideSidebars = useStarmap((state) => state.setHideSidebars)
   const touring = useStarmap((state) => state.tourStep !== null)
-
-  // The tour fades the panels itself, so edge reveal stays out of its way.
-  const left = useEdgeReveal<HTMLElement>('left', autoHide && !touring)
-  const right = useEdgeReveal<HTMLElement>('right', autoHide && !touring)
 
   useEffect(() => {
     void init()
@@ -67,10 +64,9 @@ export default function App() {
       className={[
         'app-root',
         touring ? 'tour-playing' : '',
-        // Drive the chrome that sits between the columns, so the HUD, star card
-        // and HR panel reclaim the space a hidden panel leaves behind.
-        left.open ? '' : 'left-hidden',
-        right.open ? '' : 'right-hidden',
+        // Drives the chrome that sits between the columns, so the HUD, star card
+        // and HR panel reclaim the space the panels leave behind.
+        hidden ? 'sidebars-hidden' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -96,18 +92,33 @@ export default function App() {
 
       {ready && (
         <>
-          <ViewPanel ref={left.ref} open={left.open} />
-          <LayersPanel ref={right.ref} open={right.open} />
+          <ViewPanel open={!hidden} />
+          <LayersPanel open={!hidden} />
 
-          {/* Always-visible handles: a panel that has slid away needs to leave
-              some sign that it exists, or the controls simply vanish. */}
-          {autoHide && (
+          {/* Buttons, not decoration: a panel that has slid away needs to leave
+              some sign that it exists, and on touch there is no pointer to
+              hover with — the handle has to be tappable to be a way back. */}
+          {hidden && (
             <>
-              <div className={`edge-handle edge-handle-left${left.open ? ' is-open' : ''}`} aria-hidden />
-              <div className={`edge-handle edge-handle-right${right.open ? ' is-open' : ''}`} aria-hidden />
+              <button
+                type="button"
+                className="edge-handle edge-handle-left"
+                aria-label="Show the side panels"
+                onClick={() => setHideSidebars(false)}
+              />
+              <button
+                type="button"
+                className="edge-handle edge-handle-right"
+                aria-label="Show the side panels"
+                onClick={() => setHideSidebars(false)}
+              />
             </>
           )}
-          <SearchBox />
+
+          <div className="top-bar">
+            <SearchBox />
+            <SidebarToggle />
+          </div>
           <StarCard />
           {showHr && <HrDiagram />}
           <Hud />

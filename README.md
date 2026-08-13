@@ -72,10 +72,9 @@ the hash it wrote, so none of them is a link nobody has opened.
 - **A brushable HR diagram.** Drag a box around the giant branch or the main
   sequence and everything outside it dims in the sky, so a population picked out
   by physics can be seen in space.
-- **Auto-hiding panels.** Both columns slide away so the sky fills the frame,
-  and come back when the pointer reaches for either edge. A thin handle marks
-  where they went; a drag that strays off a slider will not snatch the panel
-  away mid-gesture.
+- **Hide sidebars**, a switch in the top bar. Both columns slide away and the
+  sky fills the frame; a handle at each edge brings them back, sized for a
+  finger rather than a cursor. The choice is remembered for the next visit.
 - **Shareable views** — the address bar tracks culture, figure, camera, layers,
   frame and epoch, so any view can be sent as a link and survives a refresh.
 
@@ -146,7 +145,7 @@ gitignored and fully reproducible.
 npm test             # unit tests
 npm run check:camera # drives real pointer/wheel input at a running dev server
 npm run check:links  # proves a shared link restores the view it captured
-npm run check:panels # drives real pointer movement at the auto-hiding panels
+npm run check:panels # drives real pointer and touch input at the sidebar switch
 npm run build        # production bundle
 ```
 

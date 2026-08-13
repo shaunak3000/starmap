@@ -16,17 +16,11 @@ import { formatDistance } from './format.ts'
  * a laptop viewport without scrolling — hunting for a control you know is there
  * costs more than the words saved by explaining it.
  */
-export function ViewPanel({
-  ref,
-  open = true,
-}: {
-  ref?: React.Ref<HTMLElement>
-  open?: boolean
-}) {
+export function ViewPanel({ open = true }: { open?: boolean }) {
   const state = useStarmap()
 
   return (
-    <aside ref={ref} className={`panel-left panel${open ? '' : ' is-hidden'}`}>
+    <aside className={`panel-left panel${open ? '' : ' is-hidden'}`}>
       <div className="panel-scroll">
         <div className="brand">
           <span className="brand-name">starmap</span>

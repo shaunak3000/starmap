@@ -77,25 +77,27 @@ export interface CameraPose {
 /** Shell radius used when no figure is driving it. */
 export const DEFAULT_SPHERE_RADIUS_PC = 120
 
-const AUTO_HIDE_KEY = 'starmap.autoHidePanels'
+const HIDE_SIDEBARS_KEY = 'starmap.hideSidebars'
 
 /**
- * Panels auto-hide by default: the sky is the point, and the edge handles make
- * the behaviour discoverable. It is a preference rather than part of a view, so
- * it lives in localStorage and stays out of shared links.
+ * The panels are shown until someone asks for them to go. Clearing them is a
+ * deliberate act, not something the pointer triggers by wandering: chrome that
+ * comes and goes on its own is harder to work with than chrome that stays put.
+ *
+ * It is a preference rather than part of a view, so it lives in localStorage and
+ * stays out of shared links.
  */
-function readAutoHide(): boolean {
+function readHideSidebars(): boolean {
   try {
-    const stored = window.localStorage.getItem(AUTO_HIDE_KEY)
-    return stored === null ? true : stored === '1'
+    return window.localStorage.getItem(HIDE_SIDEBARS_KEY) === '1'
   } catch {
-    return true
+    return false
   }
 }
 
-export function persistAutoHide(value: boolean): void {
+function persistHideSidebars(value: boolean): void {
   try {
-    window.localStorage.setItem(AUTO_HIDE_KEY, value ? '1' : '0')
+    window.localStorage.setItem(HIDE_SIDEBARS_KEY, value ? '1' : '0')
   } catch {
     // Private browsing can refuse storage; the session default still applies.
   }
@@ -137,8 +139,8 @@ interface StarmapState {
   /** Active HR-diagram selection; null when nothing is brushed. */
   hrBrush: HrBrush | null
   showHrDiagram: boolean
-  /** Slide the side panels away until the pointer reaches for them. */
-  autoHidePanels: boolean
+  /** Clear both side panels off the sky, leaving the edge handles behind. */
+  hideSidebars: boolean
   /** Star labels awaiting placement, published by the active figure. */
   labelCandidates: LabelCandidate[]
 
@@ -177,6 +179,8 @@ interface StarmapState {
   init: () => Promise<void>
   enableFaintField: () => Promise<void>
   set: <K extends keyof StarmapState>(key: K, value: StarmapState[K]) => void
+  /** Hides or shows both panels, remembering the choice for the next visit. */
+  setHideSidebars: (value: boolean) => void
   select: (index: number | null) => void
   setActiveConstellation: (id: string | null) => void
   focusOn: (
@@ -230,7 +234,7 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   years: 0,
   hrBrush: null,
   showHrDiagram: false,
-  autoHidePanels: readAutoHide(),
+  hideSidebars: readHideSidebars(),
   labelCandidates: [],
 
   selection: null,
@@ -285,6 +289,11 @@ export const useStarmap = create<StarmapState>((set, get) => ({
   },
 
   set: (key, value) => set({ [key]: value } as never),
+
+  setHideSidebars: (value) => {
+    persistHideSidebars(value)
+    set({ hideSidebars: value })
+  },
 
   select: (index) => set({ selection: index === null ? null : { index } }),
 
